@@ -1,0 +1,4 @@
+res://scenes/WorldView.tscn
+res://core/World.gd
+res://modules/vegetation/data/VegetationTypes.gd
+res://modules/vegetation/systems/VegetationSpawnSystem.gd
