@@ -16,6 +16,7 @@ const _GrowthComponent     = preload("res://modules/vegetation/components/Growth
 const _VegetationTypes     = preload("res://modules/vegetation/data/VegetationTypes.gd")
 const _TileTypes           = preload("res://modules/terrain/data/TileTypes.gd")
 
+
 var _rng: RandomNumberGenerator = null
 
 # ---------------------------------------------------------------------------
@@ -38,7 +39,28 @@ func tick(_tick_number: int) -> void:
 		var growth = reg.get_component(entity_id, &"GrowthComponent")
 		var tile   = reg.get_component(entity_id, &"TileComponent")
 
-		veg.age += 1.0
+		# Fire takes priority — no growth on burning tiles
+		if reg.has(entity_id, &"BurningComponent"):
+			continue
+
+		# --- Survival check (Gap 5) — instant death when conditions breach threshold ---
+		var target_biome = reg.get_component(entity_id, &"BiomeComponent")
+		if target_biome != null:
+			var vd: Dictionary = _VegetationTypes.get_data(veg.veg_type)
+			var too_dry:  bool = target_biome.moisture     < (vd.get("min_survival_moisture", 0.0) as float)
+			var too_hot:  bool = target_biome.temperature  > (vd.get("max_survival_temp",     1.0) as float)
+			var too_cold: bool = target_biome.temperature  < (vd.get("min_survival_temp",     0.0) as float)
+			if too_dry or too_hot or too_cold:
+				_kill_plant(entity_id, reg)
+				continue
+
+			# --- Moisture consumption (Gap 10) ---
+			# Plants draw moisture from the biome proportional to size.
+			var consumption: float = 0.0002 * (1.0 + float(veg.growth_stage) * 0.3)
+			target_biome.moisture = maxf(0.0, target_biome.moisture - consumption)
+
+		# --- Age advancement scaled by season (Gap 4) ---
+		veg.age += world.growth_rate_mod
 
 		# --- Growth stage promotion ---
 		if veg.growth_stage < 3:
@@ -47,9 +69,10 @@ func tick(_tick_number: int) -> void:
 				veg.growth_stage = mini(veg.growth_stage + 1, 3)
 				_refresh_render(entity_id, veg, reg)
 
-		# --- Spread attempt ---
-		if _rng.randf() < growth.spread_chance:
+		# --- Spread attempt scaled by season (Gap 4) ---
+		if _rng.randf() < growth.spread_chance * world.growth_rate_mod:
 			_try_spread(entity_id, veg, growth, tile.position, reg)
+
 
 # ---------------------------------------------------------------------------
 # Internals
@@ -117,3 +140,19 @@ func _refresh_render(entity_id: int, veg, reg) -> void:
 	render.fg_color = _VegetationTypes.get_fg_color(veg.veg_type, veg.growth_stage)
 	render.bg_color = vd.get("bg_color", Color(0.03, 0.08, 0.02)) as Color
 	render.z_layer  = vd.get("z_layer", 0) as int
+
+func _kill_plant(entity_id: int, reg) -> void:
+	## Remove all vegetation components and revert the render to bare terrain.
+	reg.remove(entity_id, &"VegetationComponent")
+	if reg.has(entity_id, &"GrowthComponent"):
+		reg.remove(entity_id, &"GrowthComponent")
+	# Revert render to base tile appearance
+	var tile   = reg.get_component(entity_id, &"TileComponent")
+	var render = reg.get_component(entity_id, &"RenderComponent")
+	if tile != null and render != null:
+		var td: Dictionary = _TileTypes.get_data(tile.tile_type)
+		render.glyph    = td.get("glyph",    ".")
+		render.fg_color = td.get("fg_color", Color(0.4, 0.4, 0.3))
+		render.bg_color = td.get("bg_color", Color(0.1, 0.1, 0.05))
+		render.z_layer  = 0
+

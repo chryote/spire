@@ -57,7 +57,11 @@ const DATA: Dictionary = {
 		"z_layer":          0,
 		"initial_stage_max": 2,
 		"initial_age_max":   60,
+		"min_survival_moisture": 0.08,
+		"max_survival_temp":     0.90,
+		"min_survival_temp":     0.02,
 	},
+
 	Type.TALL_GRASS: {
 		"growth_glyphs":   ["'",  "|",  "\"", "!"],
 		"sway_glyphs":     ["/",  "/",  "'",  "|"],   # bends noticeably
@@ -79,7 +83,11 @@ const DATA: Dictionary = {
 		"z_layer":          0,
 		"initial_stage_max": 2,
 		"initial_age_max":   60,
+		"min_survival_moisture": 0.18,
+		"max_survival_temp":     0.88,
+		"min_survival_temp":     0.03,
 	},
+
 	Type.SHRUB: {
 		"growth_glyphs":   [".",  ";",  "*",  "%"],
 		"sway_glyphs":     [".",  ";",  ";",  "*"],   # barely moves (woody)
@@ -101,7 +109,11 @@ const DATA: Dictionary = {
 		"z_layer":          0,
 		"initial_stage_max": 2,
 		"initial_age_max":   60,
+		"min_survival_moisture": 0.20,
+		"max_survival_temp":     0.85,
+		"min_survival_temp":     0.04,
 	},
+
 	Type.WILDFLOWER: {
 		"growth_glyphs":   [".",  "^",  "*",  "@"],
 		"sway_glyphs":     [".",  "~",  "~",  "*"],   # petals flutter
@@ -123,7 +135,11 @@ const DATA: Dictionary = {
 		"z_layer":          0,
 		"initial_stage_max": 2,
 		"initial_age_max":   60,
+		"min_survival_moisture": 0.20,
+		"max_survival_temp":     0.82,
+		"min_survival_temp":     0.05,
 	},
+
 	# -----------------------------------------------------------------------
 	# Trees — seeded first, high z_layer, very slow growth
 	# -----------------------------------------------------------------------
@@ -148,7 +164,11 @@ const DATA: Dictionary = {
 		"z_layer":          1,
 		"initial_stage_max": 1,
 		"initial_age_max":   40,
+		"min_survival_moisture": 0.22,
+		"max_survival_temp":     0.80,
+		"min_survival_temp":     0.01,
 	},
+
 	Type.OAK_TREE: {
 		"growth_glyphs":   [".",  "t",  "T",  "Y"],
 		"sway_glyphs":     [".",  "/",  "T",  "Y"],   # canopy sways slightly
@@ -170,7 +190,11 @@ const DATA: Dictionary = {
 		"z_layer":          1,
 		"initial_stage_max": 1,
 		"initial_age_max":   40,
+		"min_survival_moisture": 0.25,
+		"max_survival_temp":     0.83,
+		"min_survival_temp":     0.04,
 	},
+
 }
 
 static func get_data(veg_type: int) -> Dictionary:

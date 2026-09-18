@@ -100,12 +100,16 @@ func _classify_tile(height: float, moisture: float) -> int:
 	else:
 		return _TileTypes.Type.STONE
 
-func _classify_biome(height: float, moisture: float, _temperature: float) -> int:
+func _classify_biome(height: float, moisture: float, temperature: float) -> int:
+	# Cold latitudes override everything — too frigid for normal biomes.
+	if temperature < 0.15:
+		return _BiomeTypes.Type.TUNDRA
 	if moisture > 0.62 and height < -0.1:
 		return _BiomeTypes.Type.WETLAND
-	elif moisture > 0.48 and height < 0.25:
-		return _BiomeTypes.Type.FOREST_EDGE
-	elif height > 0.32:
+	if moisture > 0.48 and height < 0.25:
+		# Forest edge only viable at warmer temperatures.
+		return _BiomeTypes.Type.FOREST_EDGE if temperature > 0.30 else _BiomeTypes.Type.TUNDRA
+	if height > 0.32:
 		return _BiomeTypes.Type.BARREN
-	else:
-		return _BiomeTypes.Type.PLAINS
+	return _BiomeTypes.Type.PLAINS
+

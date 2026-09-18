@@ -9,4 +9,6 @@ enum Type {
 	FOREST_EDGE,  ## Moisture-rich transition zone — dense vegetation
 	WETLAND,      ## Low soggy terrain — mud and water plants
 	BARREN,       ## High rocky terrain — sparse life
+	TUNDRA,       ## Cold terrain — near-zero vegetation, frost-prone
 }
+

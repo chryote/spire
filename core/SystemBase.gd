@@ -30,5 +30,5 @@ func initialize() -> void:
 
 ## Called every simulation tick in priority order.
 ## [param tick_number] is a monotonically increasing counter starting at 1.
-func tick(tick_number: int) -> void:
+func tick(_tick_number: int) -> void:
 	pass

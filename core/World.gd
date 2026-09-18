@@ -22,9 +22,18 @@ const _SystemBase         = preload("res://core/SystemBase.gd")
 const _Query              = preload("res://core/Query.gd")
 
 const _TerrainGenSystem      = preload("res://modules/terrain/systems/TerrainGenSystem.gd")
+const _ClimateSystem         = preload("res://modules/weather/systems/ClimateSystem.gd")
+const _WeatherSystem         = preload("res://modules/weather/systems/WeatherSystem.gd")
+const _RainSystem            = preload("res://modules/weather/systems/RainSystem.gd")
+const _MatterAssignSystem    = preload("res://modules/matter/systems/MatterAssignSystem.gd")
+const _PhaseChangeSystem     = preload("res://modules/matter/systems/PhaseChangeSystem.gd")
+const _CombustionSystem      = preload("res://modules/matter/systems/CombustionSystem.gd")
+const _FluidSystem           = preload("res://modules/matter/systems/FluidSystem.gd")
+const _GasSystem             = preload("res://modules/matter/systems/GasSystem.gd")
+const _ChemicalReactionSystem= preload("res://modules/matter/systems/ChemicalReactionSystem.gd")
+const _DecaySystem           = preload("res://modules/matter/systems/DecaySystem.gd")
 const _VegetationSpawnSystem = preload("res://modules/vegetation/systems/VegetationSpawnSystem.gd")
 const _VegetationGrowthSystem= preload("res://modules/vegetation/systems/VegetationGrowthSystem.gd")
-const _WeatherSystem         = preload("res://modules/weather/systems/WeatherSystem.gd")
 
 # ---------------------------------------------------------------------------
 # Map constants
@@ -33,14 +42,46 @@ const MAP_WIDTH: int  = 128
 const MAP_HEIGHT: int = 128
 
 # ---------------------------------------------------------------------------
+# Time constants (Dwarf Fortress-exact)
+# ---------------------------------------------------------------------------
+const TICKS_PER_DAY:    int = 1_200
+const TICKS_PER_MONTH:  int = 28_800   ## 24 days
+const TICKS_PER_SEASON: int = 100_800  ## 84 days / 3 months
+const TICKS_PER_YEAR:   int = 403_200  ## 4 seasons
+
+# ---------------------------------------------------------------------------
+# Temperature scale — change these two values to rescale the whole simulation
+# ---------------------------------------------------------------------------
+## Celsius at BiomeComponent.temperature = 0.0  (deep winter / polar).
+const TEMP_MIN_C: float = -50.0
+## Celsius at BiomeComponent.temperature = 1.0  (extreme heat peak).
+const TEMP_MAX_C: float = 150.0
+
+# ---------------------------------------------------------------------------
 # Weather state (written by WeatherSystem each tick, read by AsciiRenderSystem)
 # ---------------------------------------------------------------------------
 ## Normalised wind direction vector.
 var wind_direction: Vector2 = Vector2(1.0, 0.0)
 ## Wind intensity 0.0 (dead calm) → 1.0 (full storm).
 var wind_strength: float = 0.0
-## Integer condition: 0=CALM, 1=BREEZY, 2=WINDY, 3=STORM.
+## Integer condition: 0=CALM, 1=BREEZY, 2=WINDY, 3=RAIN, 4=STORM.
 var wind_condition: int = 1
+## Whether current weather conditions permit precipitation to emerge (written by WeatherSystem).
+var rain_allowed: bool = false
+
+# ---------------------------------------------------------------------------
+# Season state (written by ClimateSystem each tick)
+# ---------------------------------------------------------------------------
+## Current season: 0=SPRING, 1=SUMMER, 2=AUTUMN, 3=WINTER.
+var season: int = 0
+## Progress through the current season 0.0 (start) → 1.0 (end).
+var season_progress: float = 0.0
+## Smooth temperature modifier: -1.0 (deep winter) → +1.0 (peak summer).
+var season_temp_mod: float = 0.0
+## Vegetation growth rate modifier driven by season: 0.0 (winter) → 1.0 (summer peak).
+## Written by ClimateSystem each tick; read by VegetationGrowthSystem.
+var growth_rate_mod: float = 1.0
+
 
 # ---------------------------------------------------------------------------
 # Turn-tick configuration
@@ -112,12 +153,41 @@ func _register_modules() -> void:
 	# --- Terrain module (priority 0: runs first, one-shot generation) ---
 	_add_system(_TerrainGenSystem.new(), 0)
 
-	# --- Weather module (priority 5: sets wind state before vegetation reads it) ---
-	_add_system(_WeatherSystem.new(), 5)
+	# --- Matter module (priority 10: one-shot material assignment, right after terrain) ---
+	_add_system(_MatterAssignSystem.new(), 10)
+
+	# --- Climate module (priority 40: seasons + per-tile temperature, before wind) ---
+	_add_system(_ClimateSystem.new(), 40)
+
+	# --- Weather module (priority 50: sets wind state before rain reads it) ---
+	_add_system(_WeatherSystem.new(), 50)
+
+	# --- Rain module (priority 60: reads wind, updates moisture & temperature) ---
+	_add_system(_RainSystem.new(), 60)
 
 	# --- Vegetation module ---
-	_add_system(_VegetationSpawnSystem.new(), 10)   # one-shot seeding
-	_add_system(_VegetationGrowthSystem.new(), 20)  # per-tick growth & spread
+	_add_system(_VegetationSpawnSystem.new(), 100)   # one-shot seeding
+
+	# --- Phase change (priority 150: melting, freezing, drying — after climate/rain) ---
+	_add_system(_PhaseChangeSystem.new(), 150)
+
+	# --- Combustion (priority 160: fire spread + burnout — after phase change) ---
+	_add_system(_CombustionSystem.new(), 160)
+
+	# --- Fluid simulation (priority 170: liquid flow downhill, freeze, ignition) ---
+	_add_system(_FluidSystem.new(), 170)
+
+	# --- Gas simulation (priority 180: atmospheric diffusion, dissipation, toxic/corrosive tagging) ---
+	_add_system(_GasSystem.new(), 180)
+
+	# --- Chemical reactions (priority 185: acid corrosion, structural yield breakdown) ---
+	_add_system(_ChemicalReactionSystem.new(), 185)
+
+	# --- Biological decay (priority 190: rot, spoilage, preservation) ---
+	_add_system(_DecaySystem.new(), 190)
+
+	# --- Vegetation growth (priority 200: last, reads clean matter state) ---
+	_add_system(_VegetationGrowthSystem.new(), 200)  # per-tick growth & spread
 
 	# Sort ascending by priority so lower numbers execute first
 	_sim_systems.sort_custom(func(a, b) -> bool: return a.priority < b.priority)
