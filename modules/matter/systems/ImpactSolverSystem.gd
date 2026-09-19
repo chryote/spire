@@ -18,6 +18,7 @@ const _BurningComponent     = preload("res://modules/matter/components/BurningCo
 const _ContaminantComponent = preload("res://modules/matter/components/ContaminantComponent.gd")
 const _FluidComponent       = preload("res://modules/matter/components/FluidComponent.gd")
 const _TileTypes            = preload("res://modules/terrain/data/TileTypes.gd")
+const _ItemTypes            = preload("res://modules/item/data/ItemTypes.gd")
 
 func initialize() -> void:
 	print("[ImpactSolverSystem] Initialized. Priority 165.")
@@ -212,6 +213,15 @@ static func _solve_solid_vs_solid(
 	# Acoustic sound loudness (0.0 to 1.0)
 	var max_h: float = maxf(s_hard, t_hard)
 	res.sound_loudness = clampf((log(1.0 + res.energy_absorbed) / 5.5) * (max_h / 8.0 + 0.35), 0.1, 1.0)
+
+	# Contaminant transfer on cutting / piercing / damaging impact
+	if res.damage_to_target > 0.0 or res.penetration_depth > 0.0:
+		if s.toxicity > 0.0:
+			res.contaminants_transferred["toxicity"] = s.toxicity
+			res.contaminants_transferred["source_mat_id"] = s.material_id
+		if s.corrosiveness > 0.0:
+			res.contaminants_transferred["corrosion"] = s.corrosiveness
+			res.contaminants_transferred["source_mat_id"] = s.material_id
 
 	# Debris material assignment
 	if res.target_fractured:
@@ -441,6 +451,7 @@ func resolve_entity_impact(
 	var reg = world.get_registry()
 	var s_matter = reg.get_component(striker_eid, &"MatterComponent")
 	var t_matter = reg.get_component(target_eid, &"MatterComponent")
+	var s_item   = reg.get_component(striker_eid, &"ItemComponent")
 
 	# Fallbacks if MatterComponent is not yet attached
 	if s_matter == null:
@@ -450,7 +461,52 @@ func resolve_entity_impact(
 		t_matter = _MatterComponent.new()
 		_MaterialTypes.apply_to(t_matter, _MaterialTypes.Type.GROUND)
 
-	var result: _ImpactTypes.ImpactResult = solve_impact(s_matter, t_matter, params)
+	# If striker is an item entity, enrich params with its mold geometry if unspecified
+	var effective_params: _ImpactTypes.ImpactParams = params
+	if s_item != null:
+		if effective_params == null:
+			effective_params = _ItemTypes.build_impact_params(s_item, s_matter, Vector2(10.0, 0.0))
+		elif effective_params.contact_area <= 0.0001 and effective_params.form == _ImpactTypes.Form.BLUNT:
+			var mold_params = _ItemTypes.build_impact_params(s_item, s_matter, effective_params.velocity)
+			effective_params.form = mold_params.form
+			effective_params.contact_area = mold_params.contact_area
+			effective_params.sharpness = mold_params.sharpness
+			if effective_params.mass <= 1.0 and s_item.total_mass > 0.0:
+				effective_params.mass = mold_params.mass
+				if effective_params.kinetic_energy <= 0.1:
+					effective_params.kinetic_energy = mold_params.kinetic_energy
+
+	var result: _ImpactTypes.ImpactResult = solve_impact(s_matter, t_matter, effective_params)
+
+	# Check for explosive payload in striker item (e.g. Blasting Warhammer)
+	var explosive_part_name: String = ""
+	if s_item != null:
+		for part_name: String in s_item.parts:
+			var p: Dictionary = s_item.parts[part_name]
+			var p_mat = _MaterialTypes.get_data(p["material_id"])
+			if p.get("wear", 0.0) < 1.0 and p_mat.get("flammability", 0.0) >= 0.90:
+				explosive_part_name = part_name
+				break
+
+	if explosive_part_name != "" and effective_params.kinetic_energy >= 35.0:
+		var blast_damage: float = 300.0
+		result.damage_to_target += blast_damage
+		result.heat_generated_c += 350.0
+		result.sparks_produced = true
+		result.ignition_occurred = true
+		result.sound_loudness = 1.0
+		result.outcome = _ImpactTypes.Outcome.SHATTERED
+		s_item.parts[explosive_part_name]["wear"] = 1.0
+		result.summary += " [EXPLOSIVE DETONATION: +%.0f blast damage!]" % blast_damage
+
+	# Consume weapon surface coating on hit
+	if s_item != null and s_item.parts.has("coating"):
+		var c_wear: float = s_item.parts["coating"].get("wear", 0.0)
+		if c_wear < 1.0:
+			s_item.parts["coating"]["wear"] = minf(1.0, c_wear + 0.25)
+			if s_item.parts["coating"]["wear"] >= 1.0:
+				s_matter.toxicity = 0.0
+				s_matter.corrosiveness = 0.0
 
 	# 1. Apply structural damage to target
 	if result.damage_to_target > 0.0:
@@ -458,9 +514,12 @@ func resolve_entity_impact(
 		if result.target_fractured or t_matter.yield_strength <= 0.0:
 			_handle_target_fracture(target_eid, t_matter, result, reg)
 
-	# 2. Apply wear/damage to striker
+	# 2. Apply wear/damage to striker (including ItemComponent parts wear)
 	if result.damage_to_striker > 0.0:
 		s_matter.yield_strength = maxf(0.0, s_matter.yield_strength - result.damage_to_striker)
+		if s_item != null and s_item.parts.has(s_item.primary_part):
+			var wear_delta = result.damage_to_striker / maxf(1.0, s_matter.yield_strength + result.damage_to_striker)
+			s_item.parts[s_item.primary_part]["wear"] = clampf(s_item.parts[s_item.primary_part]["wear"] + wear_delta, 0.0, 1.0)
 		if result.striker_fractured or s_matter.yield_strength <= 0.0:
 			_handle_striker_fracture(striker_eid, s_matter, result, reg)
 
@@ -533,7 +592,10 @@ func _handle_target_fracture(target_eid: int, t_matter, result: _ImpactTypes.Imp
 			tile_comp.tile_type = new_tile_type
 			_update_render(target_eid, new_tile_type, reg)
 
-func _handle_striker_fracture(striker_eid: int, s_matter, result: _ImpactTypes.ImpactResult, _reg) -> void:
+func _handle_striker_fracture(striker_eid: int, s_matter, result: _ImpactTypes.ImpactResult, reg) -> void:
+	var s_item = reg.get_component(striker_eid, &"ItemComponent")
+	if s_item != null and s_item.parts.has(s_item.primary_part):
+		s_item.parts[s_item.primary_part]["wear"] = 1.0
 	if result.debris_material_id != -1:
 		s_matter.material_id = result.debris_material_id
 		_apply_material_archetype(s_matter, _MaterialTypes.get_data(result.debris_material_id))

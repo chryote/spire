@@ -1,12 +1,18 @@
 ## ItemFactory.gd
-## Stateless item-creation utility.  NOT a simulation system — has no tick().
+## Stateless item-creation utility. NOT a simulation system — has no tick().
 ## Call its static methods from any system that needs to spawn item entities.
 ##
 ## Usage:
-##   # Create a standalone item entity
-##   var id := ItemFactory.create(world, ItemTypes.Type.GRASS, MaterialTypes.Type.ORGANIC)
+##   # Create a single-material item (backward compatible)
+##   var id := ItemFactory.create(world, ItemTypes.Type.SWORD, MaterialTypes.Type.STEEL)
 ##
-##   # Create and immediately add to a tile's inventory
+##   # Create a multi-part composite item
+##   var id := ItemFactory.create_composite(world, ItemTypes.Type.SWORD, {
+##       "blade": MaterialTypes.Type.STEEL,
+##       "hilt":  MaterialTypes.Type.WOOD_HARD,
+##   })
+##
+##   # Create and deposit into inventory
 ##   ItemFactory.create_and_deposit(world, ItemTypes.Type.GRASS, MaterialTypes.Type.ORGANIC, tile_entity_id)
 class_name ItemFactory
 extends RefCounted
@@ -17,43 +23,205 @@ const _ItemComponent      = preload("res://modules/item/components/ItemComponent
 const _ItemTypes          = preload("res://modules/item/data/ItemTypes.gd")
 const _InventoryComponent = preload("res://modules/item/components/InventoryComponent.gd")
 
-## Create a new item entity and return its entity_id.
-## Asserts that (item_type, material_type) is a valid combination.
+## Create a new single-material item entity (100% backwards compatible).
+## Automatically maps material_type to compatible parts, using archetype defaults for others.
 static func create(world: Node, item_type: int, material_type: int, quantity: int = 1) -> int:
-	assert(
-		_ItemTypes.is_valid_combination(item_type, material_type),
-		"ItemFactory: invalid combo item_type=%d material_type=%d" % [item_type, material_type]
-	)
+	var mold_parts: Dictionary = _ItemTypes.get_parts_data(item_type)
+	var parts_map: Dictionary = {}
 
+	for part_name: String in mold_parts:
+		var part_def: Dictionary = mold_parts[part_name]
+		var valid: Array = part_def.get("valid_matters", [])
+		if material_type in valid:
+			parts_map[part_name] = material_type
+		else:
+			parts_map[part_name] = part_def.get("default_matter", material_type)
+
+	return create_composite(world, item_type, parts_map, quantity)
+
+## Create a multi-material composite item entity.
+## Computes individual part masses, total mass, contact geometry, and synthesizes
+## composite physical, thermodynamic, and mechanical stats onto MatterComponent.
+static func create_composite(
+	world: Node,
+	item_type: int,
+	parts_materials: Dictionary,
+	quantity: int = 1
+) -> int:
+	var mold_parts: Dictionary = _ItemTypes.get_parts_data(item_type)
+	var primary_name: String = _ItemTypes.get_primary_part_name(item_type)
+
+	# 1. Resolve and complete parts map
+	var resolved_parts: Dictionary = {}
+	var total_mass: float = 0.0
+	var total_volume: float = 0.0
+
+	var sum_c_mass: float = 0.0
+	var sum_flammability: float = 0.0
+	var min_ignition_c: float = INF
+	var max_rot_rate: float = 0.0
+	var sum_cond_vol: float = 0.0
+	var sum_moisture_mass: float = 0.0
+
+	var primary_mat_id: int = 0
+	var primary_mat_data: Dictionary = {}
+	var primary_thickness: float = 0.05
+	var handle_yield_cap: float = INF
+
+	for part_name: String in mold_parts:
+		var part_def: Dictionary = mold_parts[part_name]
+		if part_def.get("optional", false) and not parts_materials.has(part_name):
+			continue
+
+		var mat_id: int = parts_materials.get(part_name, part_def.get("default_matter", 0))
+		var mat_data: Dictionary = _MaterialTypes.get_data(mat_id)
+		var vol: float = part_def.get("volume", 0.0005)
+		var density: float = mat_data.get("density", 1000.0)
+		var mass: float = maxf(0.001, vol * density)
+		var role: int = part_def.get("role", _ItemTypes.PartRole.PRIMARY_CONTACT)
+		var thickness: float = part_def.get("thickness", 0.05)
+
+		resolved_parts[part_name] = {
+			"material_id": mat_id,
+			"role":        role,
+			"volume":      vol,
+			"mass":        mass,
+			"wear":        0.0,
+		}
+
+		total_mass += mass
+		total_volume += vol
+
+		# Weighted thermodynamics
+		var spec_heat: float = mat_data.get("specific_heat", 1000.0)
+		sum_c_mass += mass * spec_heat
+		sum_flammability += vol * (mat_data.get("flammability", 0.0) as float)
+		sum_cond_vol += vol * (mat_data.get("conductivity", 1.0) as float)
+		sum_moisture_mass += mass * (mat_data.get("moisture", 0.0) as float)
+
+		var ign: float = mat_data.get("ignition_temp_c", INF)
+		if ign < min_ignition_c:
+			min_ignition_c = ign
+
+		var rot: float = mat_data.get("rot_rate", 0.0)
+		if rot > max_rot_rate:
+			max_rot_rate = rot
+
+		if role == _ItemTypes.PartRole.PRIMARY_CONTACT or part_name == primary_name:
+			primary_mat_id = mat_id
+			primary_mat_data = mat_data
+			primary_thickness = thickness
+		elif role == _ItemTypes.PartRole.HANDLE:
+			var h_yield: float = mat_data.get("yield_strength", 100.0)
+			handle_yield_cap = h_yield * (thickness / 0.035) * 1.5
+
+	if primary_mat_data.is_empty():
+		primary_mat_data = _MaterialTypes.get_data(primary_mat_id)
+
+	total_volume = maxf(0.00001, total_volume)
+	total_mass = maxf(0.001, total_mass)
+
+	# 2. Instantiate ECS Entity
 	var entity_id: int = world.create_entity()
+
+	# 3. Populate ItemComponent
 	var comp := _ItemComponent.new()
 	comp.item_type     = item_type
-	comp.material_type = material_type
-	comp.display_name  = _ItemTypes.build_name(item_type, material_type)
+	comp.material_type = primary_mat_id
+	comp.primary_part  = primary_name
+	comp.parts         = resolved_parts
+	comp.total_mass    = total_mass
+	comp.total_volume  = total_volume
+	comp.display_name  = _ItemTypes.build_composite_name(item_type, parts_materials)
 	comp.quantity      = quantity
 	world.add_component(entity_id, comp)
 
+	# 4. Synthesize composite physical stats into MatterComponent
 	var matter := _MatterComponent.new()
-	_MaterialTypes.apply_to(matter, material_type)
+	matter.material_id     = primary_mat_id
+	matter.state           = 0  # Solid
+	matter.density         = total_mass / total_volume
+
+	# Surface properties are dictated by the primary striking/contact part
+	matter.hardness        = primary_mat_data.get("hardness", 5.0)
+	matter.acidity_ph      = primary_mat_data.get("acidity_ph", 7.0)
+	matter.corrosiveness   = primary_mat_data.get("corrosiveness", 0.0)
+	matter.toxicity        = primary_mat_data.get("toxicity", 0.0)
+	matter.elasticity      = primary_mat_data.get("elasticity", 0.3)
+	matter.melting_point_c = primary_mat_data.get("melting_point_c", INF)
+	matter.boiling_point_c = primary_mat_data.get("boiling_point_c", INF)
+
+	# If the item has a surface coating, its chemical properties transfer to the striking surface
+	if resolved_parts.has("coating"):
+		var coat_mat = _MaterialTypes.get_data(resolved_parts["coating"]["material_id"])
+		if coat_mat.get("toxicity", 0.0) > 0.0:
+			matter.toxicity = maxf(matter.toxicity, coat_mat.get("toxicity", 0.0))
+		if coat_mat.get("corrosiveness", 0.0) > 0.0:
+			matter.corrosiveness = maxf(matter.corrosiveness, coat_mat.get("corrosiveness", 0.0))
+		if (coat_mat.get("acidity_ph", 7.0) as float) < matter.acidity_ph:
+			matter.acidity_ph = coat_mat.get("acidity_ph", 7.0)
+
+	# Structural strength: primary part scaled by thickness, limited by handle strength
+	var base_yield: float = primary_mat_data.get("yield_strength", 100.0)
+	var scaled_yield: float = base_yield * (primary_thickness / 0.02)
+	matter.yield_strength  = minf(scaled_yield, handle_yield_cap)
+
+	# Hazard & thermal integration
+	matter.ignition_temp_c = min_ignition_c
+	# Flammability reflects the most combustible part when exposed to heat
+	var max_part_flammability: float = 0.0
+	for p in resolved_parts.values():
+		var p_mat = _MaterialTypes.get_data(p["material_id"])
+		max_part_flammability = maxf(max_part_flammability, p_mat.get("flammability", 0.0))
+	matter.flammability    = max_part_flammability
+
+	matter.specific_heat   = sum_c_mass / total_mass
+	matter.conductivity    = sum_cond_vol / total_volume
+	matter.moisture        = sum_moisture_mass / total_mass
+	matter.rot_rate        = max_rot_rate
+
 	world.add_component(entity_id, matter)
 
 	return entity_id
 
-## Create an item entity and push it into target_entity's InventoryComponent.
-## Returns the new item entity_id, or -1 if the target has no inventory or is full.
-## Inherits initial temperature from the target entity (tile, container, or creature).
+## Create a single-material item entity and deposit it into an inventory.
 static func create_and_deposit(
-		world: Node,
-		item_type: int,
-		material_type: int,
-		target_entity: int,
-		quantity: int = 1) -> int:
-
+	world: Node,
+	item_type: int,
+	material_type: int,
+	target_entity: int,
+	quantity: int = 1
+) -> int:
 	var inv: _InventoryComponent = world.get_component(target_entity, &"InventoryComponent")
 	if inv == null or not inv.has_space():
 		return -1
 
 	var item_id: int = create(world, item_type, material_type, quantity)
+	_finalize_deposit(world, item_id, target_entity, inv)
+	return item_id
+
+## Create a multi-material composite item entity and deposit it into an inventory.
+static func create_composite_and_deposit(
+	world: Node,
+	item_type: int,
+	parts_materials: Dictionary,
+	target_entity: int,
+	quantity: int = 1
+) -> int:
+	var inv: _InventoryComponent = world.get_component(target_entity, &"InventoryComponent")
+	if inv == null or not inv.has_space():
+		return -1
+
+	var item_id: int = create_composite(world, item_type, parts_materials, quantity)
+	_finalize_deposit(world, item_id, target_entity, inv)
+	return item_id
+
+static func _finalize_deposit(
+	world: Node,
+	item_id: int,
+	target_entity: int,
+	inv: _InventoryComponent
+) -> void:
 	var item_comp: _ItemComponent = world.get_component(item_id, &"ItemComponent")
 	if item_comp != null:
 		item_comp.container_id = target_entity
@@ -65,6 +233,6 @@ static func create_and_deposit(
 		item_matter.temperature_c = target_matter.temperature_c
 
 	inv.items.append(item_id)
-	return item_id
+
 
 
