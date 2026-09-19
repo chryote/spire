@@ -35,6 +35,8 @@ const _DecaySystem           = preload("res://modules/matter/systems/DecaySystem
 const _VegetationSpawnSystem = preload("res://modules/vegetation/systems/VegetationSpawnSystem.gd")
 const _VegetationGrowthSystem= preload("res://modules/vegetation/systems/VegetationGrowthSystem.gd")
 const _VegetationYieldSystem = preload("res://modules/vegetation/systems/VegetationYieldSystem.gd")
+const _ImpactSolverSystem    = preload("res://modules/matter/systems/ImpactSolverSystem.gd")
+const _SignalSystem          = preload("res://modules/signal/systems/SignalSystem.gd")
 
 # ---------------------------------------------------------------------------
 # Map constants
@@ -111,6 +113,8 @@ var _tile_index: Dictionary = {}        # Vector2i → int (entity_id)
 # ---------------------------------------------------------------------------
 var _registry = null   # ComponentRegistry instance
 var _sim_systems: Array = []
+var impact_solver = null
+var signals = null
 
 # ---------------------------------------------------------------------------
 # Signals
@@ -179,6 +183,10 @@ func _register_modules() -> void:
 	# --- Combustion (priority 160: fire spread + burnout — after phase change) ---
 	_add_system(_CombustionSystem.new(), 160)
 
+	# --- Impact / Collision solver (priority 165: physical kinetic strikes, damage, splash) ---
+	impact_solver = _ImpactSolverSystem.new()
+	_add_system(impact_solver, 165)
+
 	# --- Fluid simulation (priority 170: liquid flow downhill, freeze, ignition) ---
 	_add_system(_FluidSystem.new(), 170)
 
@@ -196,6 +204,10 @@ func _register_modules() -> void:
 
 	# --- Vegetation yield (priority 210: deposits items from grass onto tile inventory) ---
 	_add_system(_VegetationYieldSystem.new(), 210)  # per-tick item production from plants
+
+	# --- Spatial signals (priority 220: sound impulses, hazard, olfactory channels) ---
+	signals = _SignalSystem.new()
+	_add_system(signals, 220)
 
 	# Sort ascending by priority so lower numbers execute first
 	_sim_systems.sort_custom(func(a, b) -> bool: return a.priority < b.priority)
