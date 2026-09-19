@@ -20,6 +20,15 @@ extends "res://core/SystemBase.gd"
 
 const SEASON_NAMES: Array = ["SPRING", "SUMMER", "AUTUMN", "WINTER"]
 
+## Cardinal cloud drift directions, one per season.
+## SPRING → North, SUMMER → East, AUTUMN → South, WINTER → West.
+const SEASON_CLOUD_DIRS: Array = [
+	Vector2( 0.0, -1.0),  # SPRING  → North
+	Vector2( 1.0,  0.0),  # SUMMER  → East
+	Vector2( 0.0,  1.0),  # AUTUMN  → South
+	Vector2(-1.0,  0.0),  # WINTER  → West
+]
+
 ## Amplitude of the seasonal offset applied to each tile's base temperature.
 ## A value of 0.25 means ±0.25 swing around the latitudinal base.
 const SEASON_AMPLITUDE: float = 0.25
@@ -85,6 +94,14 @@ func tick(tick_number: int) -> void:
 	# --- Write seasonal growth modifier ---
 	world.growth_rate_mod = SEASON_GROWTH_MOD[world.season] as float
 
+	# --- Smooth cloud drift direction: slerp current → next season cardinal ---
+	# Transition blending kicks in over the last 20% of each season so the
+	# direction rotates gradually rather than snapping on the season boundary.
+	var cur_dir: Vector2  = SEASON_CLOUD_DIRS[world.season]         as Vector2
+	var next_dir: Vector2 = SEASON_CLOUD_DIRS[(world.season + 1) % 4] as Vector2
+	var blend: float = smoothstep(0.80, 1.0, world.season_progress)
+	world.cloud_direction = cur_dir.slerp(next_dir, blend).normalized()
+
 	# --- Update per-tile temperatures ---
 	# RainSystem (priority 6) applies its cooling ON TOP of this value,
 	# so we always reset from base first — UNLESS the tile or a neighbour
@@ -102,8 +119,9 @@ func tick(tick_number: int) -> void:
 			if b_tile != null:
 				burning_positions[b_tile.position] = true
 
+	var biome_store: Dictionary = reg.get_store(&"BiomeComponent")
 	for entity_id: int in _base_temps:
-		var biome = reg.get_component(entity_id, &"BiomeComponent")
+		var biome = biome_store.get(entity_id, null)
 		if biome == null:
 			continue
 

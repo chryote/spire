@@ -29,6 +29,9 @@ const BASE_THRESHOLD: float = 0.38
 ## Rain field drift speed: tiles per tick per unit of wind strength.
 const DRIFT_SPEED: float = 0.08
 
+## How many ticks to skip between rain field updates (scales cost by 1/TICK_STRIDE).
+const TICK_STRIDE: int = 3
+
 ## Moisture added to BiomeComponent per tick per unit intensity.
 const MOISTURE_GAIN: float = 0.002
 
@@ -60,6 +63,9 @@ func initialize() -> void:
 	print("[Rain] Initialized.")
 
 func tick(_tick_number: int) -> void:
+	if _tick_number % TICK_STRIDE != 0:
+		return
+
 	var reg = world.get_registry()
 
 	# --- System condition gate (Approach 1) ---
@@ -75,8 +81,8 @@ func tick(_tick_number: int) -> void:
 	var wind_dir: Vector2 = world.wind_direction
 	var wind_str: float   = world.wind_strength
 
-	# Advance drift in wind direction
-	_drift += wind_dir * wind_str * DRIFT_SPEED
+	# Advance drift in wind direction — scaled by TICK_STRIDE to compensate for skipped ticks
+	_drift += wind_dir * wind_str * DRIFT_SPEED * float(TICK_STRIDE)
 
 	# Effective threshold for this season + wind
 	var season: int = world.season

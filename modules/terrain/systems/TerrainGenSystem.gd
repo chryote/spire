@@ -15,6 +15,7 @@ const _BiomeComponent  = preload("res://modules/terrain/components/BiomeComponen
 const _RenderComponent = preload("res://modules/rendering/components/RenderComponent.gd")
 const _TileTypes       = preload("res://modules/terrain/data/TileTypes.gd")
 const _BiomeTypes      = preload("res://modules/terrain/data/BiomeTypes.gd")
+const _InventoryComponent = preload("res://modules/item/components/InventoryComponent.gd")
 
 ## Change this to get a different world layout.
 var noise_seed: int = 42
@@ -82,6 +83,10 @@ func _generate() -> void:
 			render.fg_color = td["fg_color"]
 			render.bg_color = td["bg_color"]
 			reg.add(entity_id, render)
+
+			# --- InventoryComponent (empty ground tile inventory) ---
+			var inv = _InventoryComponent.new()
+			reg.add(entity_id, inv)
 
 			# --- Register spatial position ---
 			world.register_tile(entity_id, pos)

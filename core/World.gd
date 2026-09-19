@@ -34,6 +34,7 @@ const _ChemicalReactionSystem= preload("res://modules/matter/systems/ChemicalRea
 const _DecaySystem           = preload("res://modules/matter/systems/DecaySystem.gd")
 const _VegetationSpawnSystem = preload("res://modules/vegetation/systems/VegetationSpawnSystem.gd")
 const _VegetationGrowthSystem= preload("res://modules/vegetation/systems/VegetationGrowthSystem.gd")
+const _VegetationYieldSystem = preload("res://modules/vegetation/systems/VegetationYieldSystem.gd")
 
 # ---------------------------------------------------------------------------
 # Map constants
@@ -81,6 +82,10 @@ var season_temp_mod: float = 0.0
 ## Vegetation growth rate modifier driven by season: 0.0 (winter) → 1.0 (summer peak).
 ## Written by ClimateSystem each tick; read by VegetationGrowthSystem.
 var growth_rate_mod: float = 1.0
+## Normalised cloud drift direction, driven by season (independent of wind).
+## Written by ClimateSystem; forwarded to the cloud shader by AsciiRenderSystem.
+## SPRING=(0,-1 N), SUMMER=(1,0 E), AUTUMN=(0,1 S), WINTER=(-1,0 W).
+var cloud_direction: Vector2 = Vector2(0.0, -1.0)
 
 
 # ---------------------------------------------------------------------------
@@ -188,6 +193,9 @@ func _register_modules() -> void:
 
 	# --- Vegetation growth (priority 200: last, reads clean matter state) ---
 	_add_system(_VegetationGrowthSystem.new(), 200)  # per-tick growth & spread
+
+	# --- Vegetation yield (priority 210: deposits items from grass onto tile inventory) ---
+	_add_system(_VegetationYieldSystem.new(), 210)  # per-tick item production from plants
 
 	# Sort ascending by priority so lower numbers execute first
 	_sim_systems.sort_custom(func(a, b) -> bool: return a.priority < b.priority)

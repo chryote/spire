@@ -17,7 +17,7 @@ const _AsciiShader = preload("res://modules/rendering/shaders/ascii_screen.gdsha
 # ---------------------------------------------------------------------------
 # Display constants
 # ---------------------------------------------------------------------------
-const CELL_W:    int = 11   # pixels per character cell (horizontal)
+const CELL_W:    int = 18   # pixels per character cell (horizontal) — matches CELL_H for square tiles
 const CELL_H:    int = 18   # pixels per character cell (vertical)
 const FONT_SIZE: int = 15   # font point size
 
@@ -105,6 +105,7 @@ func _process(_delta: float) -> void:
 	_shader_mat.set_shader_parameter("time_sec", time_sec)
 	_shader_mat.set_shader_parameter("wind_dir", _world.wind_direction)
 	_shader_mat.set_shader_parameter("wind_strength", _world.wind_strength)
+	_shader_mat.set_shader_parameter("cloud_dir", _world.cloud_direction)
 	if _camera != null:
 		_shader_mat.set_shader_parameter("zoom_level", _camera.zoom.x)
 
@@ -213,7 +214,7 @@ func _update_simulation_textures() -> void:
 	var burn_store:   Dictionary = reg.get_store(&"BurningComponent")
 	var frozen_store: Dictionary = reg.get_store(&"FrozenComponent")
 
-	for idx: int in range(total_tiles):
+	for idx: int in total_tiles:
 		var eid: int = _tile_entity_ids[idx]
 		if eid == -1:
 			continue

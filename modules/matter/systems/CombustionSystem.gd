@@ -152,6 +152,16 @@ func _burnout(entity_id: int, matter, reg) -> void:
 	if reg.has(entity_id, &"GrowthComponent"):
 		reg.remove(entity_id, &"GrowthComponent")
 
+	# Burn up flammable items held on this tile
+	var inv = reg.get_component(entity_id, &"InventoryComponent")
+	if inv != null:
+		var items_copy: Array = inv.items.duplicate()
+		for item_id: int in items_copy:
+			var item_matter = reg.get_component(item_id, &"MatterComponent")
+			if item_matter != null and item_matter.flammability > 0.05:
+				inv.remove_item(item_id)
+				world.destroy_entity(item_id)
+
 	# Update render to charred ash
 	var render = reg.get_component(entity_id, &"RenderComponent")
 	if render != null:
@@ -162,3 +172,4 @@ func _burnout(entity_id: int, matter, reg) -> void:
 	# Reset matter to a dry, ash-like state
 	matter.flammability = 0.0
 	matter.moisture     = 0.02
+

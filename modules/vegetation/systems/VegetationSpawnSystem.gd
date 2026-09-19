@@ -13,6 +13,9 @@ const _VegetationComponent = preload("res://modules/vegetation/components/Vegeta
 const _GrowthComponent     = preload("res://modules/vegetation/components/GrowthComponent.gd")
 const _VegetationTypes     = preload("res://modules/vegetation/data/VegetationTypes.gd")
 const _TileTypes           = preload("res://modules/terrain/data/TileTypes.gd")
+const _ItemYieldComponent  = preload("res://modules/item/components/ItemYieldComponent.gd")
+const _ItemTypes           = preload("res://modules/item/data/ItemTypes.gd")
+const _MaterialTypes       = preload("res://modules/matter/data/MaterialTypes.gd")
 
 ## Spawn order for trees (checked first, before ground cover).
 const TREE_TYPES: Array    = [4, 5]  # PINE_TREE, OAK_TREE
@@ -112,6 +115,15 @@ func _try_spawn(entity_id: int, veg_type: int, biome, reg) -> bool:
 	growth.spread_chance   = vd.get("spread_chance", 0.03) as float
 	growth.spread_radius   = vd.get("spread_radius", 2) as int
 	reg.add(entity_id, growth)
+
+	# --- Attach ItemYieldComponent for grass-type plants ---
+	if veg_type in [_VegetationTypes.Type.GRASS_PATCH, _VegetationTypes.Type.TALL_GRASS]:
+		var yield_comp = _ItemYieldComponent.new()
+		yield_comp.item_type       = _ItemTypes.Type.GRASS
+		yield_comp.material_type   = _MaterialTypes.Type.ORGANIC
+		yield_comp.ticks_per_yield = vd.get("ticks_per_yield", 60) as int
+		yield_comp.max_yield       = 5
+		reg.add(entity_id, yield_comp)
 
 	# --- Update RenderComponent ---
 	_update_render(entity_id, veg, vd, reg)

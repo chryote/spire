@@ -15,9 +15,13 @@ const _VegetationComponent = preload("res://modules/vegetation/components/Vegeta
 const _GrowthComponent     = preload("res://modules/vegetation/components/GrowthComponent.gd")
 const _VegetationTypes     = preload("res://modules/vegetation/data/VegetationTypes.gd")
 const _TileTypes           = preload("res://modules/terrain/data/TileTypes.gd")
+const _ItemYieldComponent  = preload("res://modules/item/components/ItemYieldComponent.gd")
 
 
 var _rng: RandomNumberGenerator = null
+
+## How many ticks to skip between vegetation updates (cost scales by 1/TICK_STRIDE).
+const TICK_STRIDE: int = 3
 
 # ---------------------------------------------------------------------------
 # Interface
@@ -28,6 +32,9 @@ func initialize() -> void:
 	_rng.randomize()
 
 func tick(_tick_number: int) -> void:
+	if _tick_number % TICK_STRIDE != 0:
+		return
+
 	var entities: Array = world.query() \
 		.with_all([&"VegetationComponent", &"GrowthComponent", &"TileComponent"]) \
 		.run()
@@ -59,8 +66,8 @@ func tick(_tick_number: int) -> void:
 			var consumption: float = 0.0002 * (1.0 + float(veg.growth_stage) * 0.3)
 			target_biome.moisture = maxf(0.0, target_biome.moisture - consumption)
 
-		# --- Age advancement scaled by season (Gap 4) ---
-		veg.age += world.growth_rate_mod
+		# --- Age advancement scaled by season and TICK_STRIDE ---
+		veg.age += world.growth_rate_mod * float(TICK_STRIDE)
 
 		# --- Growth stage promotion ---
 		if veg.growth_stage < 3:
@@ -69,8 +76,8 @@ func tick(_tick_number: int) -> void:
 				veg.growth_stage = mini(veg.growth_stage + 1, 3)
 				_refresh_render(entity_id, veg, reg)
 
-		# --- Spread attempt scaled by season (Gap 4) ---
-		if _rng.randf() < growth.spread_chance * world.growth_rate_mod:
+		# --- Spread attempt scaled by season and TICK_STRIDE ---
+		if _rng.randf() < growth.spread_chance * world.growth_rate_mod * float(TICK_STRIDE):
 			_try_spread(entity_id, veg, growth, tile.position, reg)
 
 
@@ -128,6 +135,17 @@ func _try_spread(_source_id: int, veg, growth, source_pos: Vector2i, reg) -> voi
 	new_growth.spread_chance   = growth.spread_chance
 	new_growth.spread_radius   = growth.spread_radius
 	reg.add(target_id, new_growth)
+
+	# --- Copy ItemYieldComponent if the parent produces items ---
+	var parent_yield = reg.get_component(_source_id, &"ItemYieldComponent")
+	if parent_yield != null:
+		var child_yield = _ItemYieldComponent.new()
+		child_yield.item_type       = parent_yield.item_type
+		child_yield.material_type   = parent_yield.material_type
+		child_yield.ticks_per_yield = parent_yield.ticks_per_yield
+		child_yield.max_yield       = parent_yield.max_yield
+		child_yield.ticks_since_yield = 0
+		reg.add(target_id, child_yield)
 
 	_refresh_render(target_id, new_veg, reg)
 

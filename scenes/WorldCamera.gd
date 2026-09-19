@@ -18,8 +18,8 @@ var _drag_start: Vector2 = Vector2.ZERO
 var _cam_start:  Vector2 = Vector2.ZERO
 
 func _ready() -> void:
-	# Start centred on the map (128 × 128 tiles at 11×18 px each)
-	var cx: float = float(World.MAP_WIDTH)  * 11.0 * 0.5
+	# Start centred on the map (128 × 128 tiles at 18×18 px each)
+	var cx: float = float(World.MAP_WIDTH)  * 18.0 * 0.5
 	var cy: float = float(World.MAP_HEIGHT) * 18.0 * 0.5
 	position = Vector2(cx, cy)
 	zoom     = Vector2(1.5, 1.5)
