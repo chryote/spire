@@ -49,7 +49,9 @@ func has(entity_id: int, type_name: StringName) -> bool:
 ## Return the raw { entity_id → Resource } dict for a type.
 ## Fastest way to iterate all entities that own a component.
 func get_store(type_name: StringName) -> Dictionary:
-	return _store.get(type_name, {})
+	if not _store.has(type_name):
+		_store[type_name] = {}
+	return _store[type_name]
 
 ## Return all entity IDs that own a component of the given type.
 func get_all_with_type(type_name: StringName) -> Array:

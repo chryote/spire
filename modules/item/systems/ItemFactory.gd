@@ -23,6 +23,31 @@ const _ItemComponent      = preload("res://modules/item/components/ItemComponent
 const _ItemTypes          = preload("res://modules/item/data/ItemTypes.gd")
 const _InventoryComponent = preload("res://modules/item/components/InventoryComponent.gd")
 
+## O(1) Synchronous global item count tracking by archetype (item_type -> int)
+static var _global_counts: Dictionary = {}
+
+static func get_global_count(item_type: int) -> int:
+	return _global_counts.get(item_type, 0)
+
+static func get_total_quantity() -> int:
+	var total: int = 0
+	for count in _global_counts.values():
+		total += count as int
+	return total
+
+static func get_all_global_counts() -> Dictionary:
+	return _global_counts.duplicate()
+
+static func notify_item_created(item_type: int, qty: int = 1) -> void:
+	_global_counts[item_type] = _global_counts.get(item_type, 0) + qty
+
+static func notify_item_destroyed(item_type: int, qty: int = 1) -> void:
+	var cur: int = _global_counts.get(item_type, 0)
+	_global_counts[item_type] = maxi(0, cur - qty)
+
+static func reset_global_counts() -> void:
+	_global_counts.clear()
+
 ## Create a new single-material item entity (100% backwards compatible).
 ## Automatically maps material_type to compatible parts, using archetype defaults for others.
 static func create(world: Node, item_type: int, material_type: int, quantity: int = 1) -> int:
@@ -57,7 +82,6 @@ static func create_composite(
 	var total_volume: float = 0.0
 
 	var sum_c_mass: float = 0.0
-	var sum_flammability: float = 0.0
 	var min_ignition_c: float = INF
 	var max_rot_rate: float = 0.0
 	var sum_cond_vol: float = 0.0
@@ -95,7 +119,6 @@ static func create_composite(
 		# Weighted thermodynamics
 		var spec_heat: float = mat_data.get("specific_heat", 1000.0)
 		sum_c_mass += mass * spec_heat
-		sum_flammability += vol * (mat_data.get("flammability", 0.0) as float)
 		sum_cond_vol += vol * (mat_data.get("conductivity", 1.0) as float)
 		sum_moisture_mass += mass * (mat_data.get("moisture", 0.0) as float)
 
@@ -134,6 +157,9 @@ static func create_composite(
 	comp.total_volume  = total_volume
 	comp.display_name  = _ItemTypes.build_composite_name(item_type, parts_materials)
 	comp.quantity      = quantity
+	var mold_data: Dictionary = _ItemTypes.get_data(item_type)
+	if mold_data.has("max_stack"):
+		comp.max_stack = mold_data["max_stack"]
 	world.add_component(entity_id, comp)
 
 	# 4. Synthesize composite physical stats into MatterComponent
@@ -181,10 +207,12 @@ static func create_composite(
 	matter.rot_rate        = max_rot_rate
 
 	world.add_component(entity_id, matter)
+	notify_item_created(item_type, quantity)
 
 	return entity_id
 
 ## Create a single-material item entity and deposit it into an inventory.
+## Stacks with existing compatible items on the target entity if available.
 static func create_and_deposit(
 	world: Node,
 	item_type: int,
@@ -193,14 +221,34 @@ static func create_and_deposit(
 	quantity: int = 1
 ) -> int:
 	var inv: _InventoryComponent = world.get_component(target_entity, &"InventoryComponent")
-	if inv == null or not inv.has_space():
+	if inv == null:
+		return -1
+
+	var reg = world.get_registry()
+	# 1. Try stacking into an existing item stack on this entity
+	var existing_id: int = inv.find_stackable_item(reg, item_type, material_type)
+	if existing_id != -1:
+		var existing_item = reg.get_component(existing_id, &"ItemComponent")
+		if existing_item != null:
+			var overflow: int = existing_item.add_quantity(quantity)
+			var added: int = quantity - overflow
+			if added > 0:
+				notify_item_created(item_type, added)
+				inv.update_cache(reg)
+			if overflow <= 0:
+				return existing_id
+			quantity = overflow
+
+	if not inv.has_space():
 		return -1
 
 	var item_id: int = create(world, item_type, material_type, quantity)
 	_finalize_deposit(world, item_id, target_entity, inv)
+	inv.update_cache(reg)
 	return item_id
 
 ## Create a multi-material composite item entity and deposit it into an inventory.
+## Stacks with existing compatible composite items on the target entity if available.
 static func create_composite_and_deposit(
 	world: Node,
 	item_type: int,
@@ -209,11 +257,35 @@ static func create_composite_and_deposit(
 	quantity: int = 1
 ) -> int:
 	var inv: _InventoryComponent = world.get_component(target_entity, &"InventoryComponent")
-	if inv == null or not inv.has_space():
+	if inv == null:
+		return -1
+
+	var reg = world.get_registry()
+	var mold_parts: Dictionary = _ItemTypes.get_parts_data(item_type)
+	var primary_name: String = _ItemTypes.get_primary_part_name(item_type)
+	var primary_def: Dictionary = mold_parts.get(primary_name, {})
+	var primary_mat: int = parts_materials.get(primary_name, primary_def.get("default_matter", 0))
+
+	# Try stacking into an existing matching composite item
+	var existing_id: int = inv.find_stackable_item(reg, item_type, primary_mat, parts_materials)
+	if existing_id != -1:
+		var existing_item = reg.get_component(existing_id, &"ItemComponent")
+		if existing_item != null:
+			var overflow: int = existing_item.add_quantity(quantity)
+			var added: int = quantity - overflow
+			if added > 0:
+				notify_item_created(item_type, added)
+				inv.update_cache(reg)
+			if overflow <= 0:
+				return existing_id
+			quantity = overflow
+
+	if not inv.has_space():
 		return -1
 
 	var item_id: int = create_composite(world, item_type, parts_materials, quantity)
 	_finalize_deposit(world, item_id, target_entity, inv)
+	inv.update_cache(reg)
 	return item_id
 
 static func _finalize_deposit(

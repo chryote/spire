@@ -309,7 +309,7 @@ static func _solve_solid_vs_liquid(
 static func _solve_liquid_vs_solid(
 	s,
 	t,
-	params: _ImpactTypes.ImpactParams,
+	_params: _ImpactTypes.ImpactParams,
 	energy: float,
 	res: _ImpactTypes.ImpactResult
 ) -> void:
@@ -374,7 +374,7 @@ static func _solve_solid_vs_gas(
 ## GAS vs. SOLID
 static func _solve_gas_vs_solid(
 	s,
-	t,
+	_t,
 	_params: _ImpactTypes.ImpactParams,
 	_energy: float,
 	res: _ImpactTypes.ImpactResult
@@ -389,8 +389,8 @@ static func _solve_gas_vs_solid(
 
 ## LIQUID vs. LIQUID
 static func _solve_liquid_vs_liquid(
-	s,
-	t,
+	_s,
+	_t,
 	_params: _ImpactTypes.ImpactParams,
 	energy: float,
 	res: _ImpactTypes.ImpactResult
@@ -590,6 +590,8 @@ func _handle_target_fracture(target_eid: int, t_matter, result: _ImpactTypes.Imp
 			elif fallback_mat == _MaterialTypes.Type.KINDLING:
 				new_tile_type = _TileTypes.Type.GRASS
 			tile_comp.tile_type = new_tile_type
+			if world != null and world.signals != null:
+				world.signals.notify_tile_type_changed(tile_comp.position, new_tile_type)
 			_update_render(target_eid, new_tile_type, reg)
 
 func _handle_striker_fracture(striker_eid: int, s_matter, result: _ImpactTypes.ImpactResult, reg) -> void:

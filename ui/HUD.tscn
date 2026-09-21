@@ -1,0 +1,200 @@
+[gd_scene load_steps=5 format=3 uid="uid://spire_hud_ui"]
+
+[ext_resource type="Script" path="res://ui/HUD.gd" id="1_hud"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_panel"]
+content_margin_left = 14.0
+content_margin_top = 12.0
+content_margin_right = 14.0
+content_margin_bottom = 12.0
+bg_color = Color(0.05, 0.07, 0.11, 0.88)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.18, 0.28, 0.42, 0.9)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+shadow_color = Color(0, 0, 0, 0.4)
+shadow_size = 8
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_btn"]
+content_margin_left = 8.0
+content_margin_top = 4.0
+content_margin_right = 8.0
+content_margin_bottom = 4.0
+bg_color = Color(0.08, 0.14, 0.22, 0.9)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.25, 0.45, 0.7, 0.8)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_progress_fill"]
+bg_color = Color(0.2, 0.65, 0.9, 0.9)
+corner_radius_top_left = 2
+corner_radius_top_right = 2
+corner_radius_bottom_right = 2
+corner_radius_bottom_left = 2
+
+[node name="HUD" type="CanvasLayer"]
+layer = 100
+script = ExtResource("1_hud")
+
+[node name="ToggleBtn" type="Button" parent="."]
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -110.0
+offset_top = 10.0
+offset_right = -10.0
+offset_bottom = 36.0
+grow_horizontal = 0
+theme_override_styles/normal = SubResource("StyleBoxFlat_btn")
+theme_override_font_sizes/font_size = 12
+text = "[F3] HIDE"
+
+[node name="MainPanel" type="PanelContainer" parent="."]
+offset_left = 10.0
+offset_top = 10.0
+offset_right = 540.0
+offset_bottom = 690.0
+theme_override_styles/panel = SubResource("StyleBoxFlat_panel")
+
+[node name="Margin" type="MarginContainer" parent="MainPanel"]
+layout_mode = 2
+
+[node name="VBox" type="VBoxContainer" parent="MainPanel/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Header" type="HBoxContainer" parent="MainPanel/Margin/VBox"]
+layout_mode = 2
+
+[node name="TitleLabel" type="Label" parent="MainPanel/Margin/VBox/Header"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.9, 0.95, 1, 1)
+theme_override_font_sizes/font_size = 14
+text = "SPIRE SIMULATION MONITOR"
+
+[node name="FPSLabel" type="Label" parent="MainPanel/Margin/VBox/Header"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.4, 0.85, 0.45, 1)
+theme_override_font_sizes/font_size = 12
+text = "FPS: 60"
+
+[node name="StatusLabel" type="Label" parent="MainPanel/Margin/VBox/Header"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.7, 0.8, 0.9, 1)
+theme_override_font_sizes/font_size = 12
+text = "Tick: 0 | RUNNING"
+
+[node name="Divider1" type="HSeparator" parent="MainPanel/Margin/VBox"]
+layout_mode = 2
+
+[node name="TickSection" type="VBoxContainer" parent="MainPanel/Margin/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="TickLabel" type="Label" parent="MainPanel/Margin/VBox/TickSection"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.85, 0.9, 0.95, 1)
+theme_override_font_sizes/font_size = 11
+text = "Tick: 0.00 ms (Avg: 0.00 ms) - 0% of 100ms budget"
+
+[node name="TickBar" type="ProgressBar" parent="MainPanel/Margin/VBox/TickSection"]
+custom_minimum_size = Vector2(0, 6)
+layout_mode = 2
+theme_override_styles/fill = SubResource("StyleBoxFlat_progress_fill")
+max_value = 100.0
+step = 0.1
+value = 15.0
+show_percentage = false
+
+[node name="Divider2" type="HSeparator" parent="MainPanel/Margin/VBox"]
+layout_mode = 2
+
+[node name="ItemSection" type="VBoxContainer" parent="MainPanel/Margin/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="SectionTitle" type="Label" parent="MainPanel/Margin/VBox/ItemSection"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.6, 0.8, 1, 1)
+theme_override_font_sizes/font_size = 12
+text = "ITEM MODULE METRICS"
+
+[node name="ItemsSummaryLabel" type="Label" parent="MainPanel/Margin/VBox/ItemSection"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.9, 0.95, 1, 1)
+theme_override_font_sizes/font_size = 12
+text = "Total Item Stacks: 0  |  Total Units: 0"
+
+[node name="ItemsBreakdownLabel" type="RichTextLabel" parent="MainPanel/Margin/VBox/ItemSection"]
+custom_minimum_size = Vector2(0, 24)
+layout_mode = 2
+theme_override_font_sizes/normal_font_size = 11
+theme_override_font_sizes/bold_font_size = 11
+bbcode_enabled = true
+text = "[color=#778899]Loading item counts...[/color]"
+fit_content = true
+scroll_active = false
+
+[node name="Divider3" type="HSeparator" parent="MainPanel/Margin/VBox"]
+layout_mode = 2
+
+[node name="VegSection" type="VBoxContainer" parent="MainPanel/Margin/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="VegTitle" type="Label" parent="MainPanel/Margin/VBox/VegSection"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.5, 0.85, 0.5, 1)
+theme_override_font_sizes/font_size = 12
+text = "VEGETATION MODULE METRICS"
+
+[node name="VegSummaryLabel" type="Label" parent="MainPanel/Margin/VBox/VegSection"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.9, 0.95, 1, 1)
+theme_override_font_sizes/font_size = 12
+text = "Vegetated: 0 / 16,384 (0.0%)  |  Yield Plants: 0"
+
+[node name="VegBreakdownLabel" type="RichTextLabel" parent="MainPanel/Margin/VBox/VegSection"]
+custom_minimum_size = Vector2(0, 34)
+layout_mode = 2
+theme_override_font_sizes/normal_font_size = 11
+theme_override_font_sizes/bold_font_size = 11
+bbcode_enabled = true
+text = "[color=#778899]Loading vegetation metrics...[/color]"
+fit_content = true
+scroll_active = false
+
+[node name="Divider4" type="HSeparator" parent="MainPanel/Margin/VBox"]
+layout_mode = 2
+
+[node name="SystemSection" type="VBoxContainer" parent="MainPanel/Margin/VBox"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 4
+
+[node name="SystemTitle" type="Label" parent="MainPanel/Margin/VBox/SystemSection"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.6, 0.8, 1, 1)
+theme_override_font_sizes/font_size = 12
+text = "LIVE SYSTEM WORKLOAD (ms / tick)"
+
+[node name="SystemsTree" type="Tree" parent="MainPanel/Margin/VBox/SystemSection"]
+custom_minimum_size = Vector2(0, 200)
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_font_sizes/font_size = 11
+theme_override_font_sizes/title_button_font_size = 11
+column_titles_visible = true
+hide_root = true

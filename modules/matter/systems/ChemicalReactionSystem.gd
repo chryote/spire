@@ -109,6 +109,8 @@ func _on_corroded_through(eid: int, matter, reg) -> void:
 		_apply_material_data(matter, _MaterialTypes.get_data(_MaterialTypes.Type.GROUND))
 		if tile_comp != null:
 			tile_comp.tile_type = _TileTypes.Type.GROUND
+			if world != null and world.signals != null:
+				world.signals.notify_tile_type_changed(tile_comp.position, _TileTypes.Type.GROUND)
 			_update_render(eid, _TileTypes.Type.GROUND, reg)
 
 	elif mat_id == _MaterialTypes.Type.STONE or mat_id == _MaterialTypes.Type.OBSIDIAN:
@@ -117,6 +119,8 @@ func _on_corroded_through(eid: int, matter, reg) -> void:
 		_apply_material_data(matter, _MaterialTypes.get_data(_MaterialTypes.Type.DIRT))
 		if tile_comp != null:
 			tile_comp.tile_type = _TileTypes.Type.DIRT
+			if world != null and world.signals != null:
+				world.signals.notify_tile_type_changed(tile_comp.position, _TileTypes.Type.DIRT)
 			_update_render(eid, _TileTypes.Type.DIRT, reg)
 
 	elif mat_id in [_MaterialTypes.Type.WOOD_SOFT, _MaterialTypes.Type.WOOD_HARD, _MaterialTypes.Type.KINDLING]:

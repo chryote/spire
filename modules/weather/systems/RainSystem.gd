@@ -29,14 +29,14 @@ const BASE_THRESHOLD: float = 0.38
 ## Rain field drift speed: tiles per tick per unit of wind strength.
 const DRIFT_SPEED: float = 0.08
 
-## How many ticks to skip between rain field updates (scales cost by 1/TICK_STRIDE).
-const TICK_STRIDE: int = 3
+## How many ticks to skip between rain field updates (10 TPS = 1 update/sec).
+const TICK_STRIDE: int = 10
 
-## Moisture added to BiomeComponent per tick per unit intensity.
-const MOISTURE_GAIN: float = 0.002
+## Moisture added to BiomeComponent per tick per unit intensity (scaled for 10-tick stride).
+const MOISTURE_GAIN: float = 0.006
 
-## Temperature reduction applied per tick per unit intensity.
-const RAIN_COOLING: float = 0.003
+## Temperature reduction applied per tick per unit intensity (scaled for 10-tick stride).
+const RAIN_COOLING: float = 0.009
 
 ## Per-season adjustment to BASE_THRESHOLD (negative = lower threshold = more rain).
 const SEASON_THRESHOLD_MOD: Array = [-0.12, 0.05, -0.10, 0.18]
@@ -62,10 +62,19 @@ func initialize() -> void:
 
 	print("[Rain] Initialized.")
 
-func tick(_tick_number: int) -> void:
-	if _tick_number % TICK_STRIDE != 0:
-		return
+const SLICE_COUNT: int = 10
+var _slice_buckets: Array[PackedInt32Array] = []
+var _cached_store_size: int = -1
 
+func _rebuild_buckets(tile_store: Dictionary) -> void:
+	_slice_buckets.clear()
+	for i in range(SLICE_COUNT):
+		_slice_buckets.append(PackedInt32Array())
+	for entity_id: int in tile_store:
+		_slice_buckets[entity_id % SLICE_COUNT].append(entity_id)
+	_cached_store_size = tile_store.size()
+
+func tick(tick_number: int) -> void:
 	var reg = world.get_registry()
 
 	# --- System condition gate (Approach 1) ---
@@ -78,11 +87,18 @@ func tick(_tick_number: int) -> void:
 				reg.remove(eid, &"RainComponent")
 		return
 
+	var tile_store: Dictionary = reg.get_store(&"TileComponent")
+	if tile_store.is_empty():
+		return
+
+	if _cached_store_size != tile_store.size():
+		_rebuild_buckets(tile_store)
+
 	var wind_dir: Vector2 = world.wind_direction
 	var wind_str: float   = world.wind_strength
 
-	# Advance drift in wind direction — scaled by TICK_STRIDE to compensate for skipped ticks
-	_drift += wind_dir * wind_str * DRIFT_SPEED * float(TICK_STRIDE)
+	# Advance drift smoothly each tick
+	_drift += wind_dir * wind_str * DRIFT_SPEED
 
 	# Effective threshold for this season + wind
 	var season: int = world.season
@@ -90,10 +106,13 @@ func tick(_tick_number: int) -> void:
 		+ (SEASON_THRESHOLD_MOD[season] as float) \
 		- wind_str * 0.08
 
-	var tile_store: Dictionary = reg.get_store(&"TileComponent")
+	var slice_mod: int = tick_number % SLICE_COUNT
+	var slice: PackedInt32Array = _slice_buckets[slice_mod]
 
-	for entity_id: int in tile_store:
-		var tile = tile_store[entity_id]
+	for entity_id: int in slice:
+		var tile = tile_store.get(entity_id, null)
+		if tile == null:
+			continue
 		var pos: Vector2i = tile.position
 
 		# Sample the drifting noise field
@@ -133,6 +152,8 @@ func tick(_tick_number: int) -> void:
 						var flood_tile = reg.get_component(entity_id, &"TileComponent")
 						if flood_tile != null and flood_tile.tile_type != _TileTypes.Type.MUD:
 							flood_tile.tile_type = _TileTypes.Type.MUD
+							if world != null and world.signals != null:
+								world.signals.notify_tile_type_changed(flood_tile.position, _TileTypes.Type.MUD)
 							# Kill any vegetation (roots drown)
 							if reg.has(entity_id, &"VegetationComponent"):
 								reg.remove(entity_id, &"VegetationComponent")

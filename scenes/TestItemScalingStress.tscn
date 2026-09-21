@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://testitemscalingstress"]
+
+[ext_resource type="Script" path="res://tests/TestItemScalingStress.gd" id="1_test_script"]
+
+[node name="TestItemScalingStress" type="Node2D"]
+script = ExtResource("1_test_script")

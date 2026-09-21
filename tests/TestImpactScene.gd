@@ -29,7 +29,7 @@ func _ready() -> void:
 	_test_ecs_entity_resolution_and_sound_emission()
 
 	print("\n>>> ALL IMPACT SOLVER TESTS PASSED SUCCESSFULLY! <<<\n")
-	await get_tree().create_timer(0.5).timeout
+	await get_tree().create_timer(5.0).timeout
 	get_tree().quit(0)
 
 # ---------------------------------------------------------------------------

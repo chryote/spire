@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://testperformancediagnosis"]
+
+[ext_resource type="Script" path="res://tests/TestPerformanceDiagnosis.gd" id="1_perf_diag"]
+
+[node name="TestPerformanceDiagnosis" type="Node2D"]
+script = ExtResource("1_perf_diag")

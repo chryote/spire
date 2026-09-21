@@ -1,4 +1,4 @@
-﻿## MatterAssignSystem.gd
+## MatterAssignSystem.gd
 ## Priority 1 — one-shot terrain assignment + per-tick vegetation sync.
 ##
 ## initialize(): assigns MatterComponent to every terrain tile entity
@@ -47,35 +47,23 @@ func initialize() -> void:
 	print("[Matter] Assigned MatterComponent to %d tile entities." % count)
 
 func tick(tick_number: int) -> void:
-	if tick_number % 5 != 0:
+	if world != null and not world.is_rare_tick(tick_number):
 		return
 
 	var reg = world.get_registry()
-	var tile_store: Dictionary = reg.get_store(&"TileComponent")
+	var veg_store: Dictionary = reg.get_store(&"VegetationComponent")
 
-	for entity_id: int in tile_store:
-		var tile    = tile_store[entity_id]
-		var matter  = reg.get_component(entity_id, &"MatterComponent")
+	for entity_id: int in veg_store:
+		var matter = reg.get_component(entity_id, &"MatterComponent")
 		if matter == null:
 			continue
-
-		var has_veg: bool = reg.has(entity_id, &"VegetationComponent")
-
-		if has_veg:
-			var veg = reg.get_component(entity_id, &"VegetationComponent")
-			var expected_id: int = _MaterialTypes.VEG_MATERIAL_MAP.get(veg.veg_type, -1)
-			if expected_id >= 0 and matter.material_id != expected_id:
-				var old_moisture: float = matter.moisture
-				matter.material_id = expected_id
-				_apply_data(matter, _MaterialTypes.get_data(expected_id))
-				# Carry over moisture from previous state (plant holds less than soil)
-				matter.moisture = lerpf(old_moisture, matter.moisture, 0.3)
-		else:
-			# No vegetation — revert if we still have a veg material loaded
-			if matter.material_id in _MaterialTypes.VEG_MATERIAL_IDS:
-				var tile_mat_id: int = _MaterialTypes.TILE_MATERIAL_MAP.get(tile.tile_type, _MaterialTypes.Type.GROUND)
-				matter.material_id = tile_mat_id
-				_apply_data(matter, _MaterialTypes.get_data(tile_mat_id))
+		var veg = veg_store[entity_id]
+		var expected_id: int = _MaterialTypes.VEG_MATERIAL_MAP.get(veg.veg_type, -1)
+		if expected_id >= 0 and matter.material_id != expected_id:
+			var old_moisture: float = matter.moisture
+			matter.material_id = expected_id
+			_apply_data(matter, _MaterialTypes.get_data(expected_id))
+			matter.moisture = lerpf(old_moisture, matter.moisture, 0.3)
 
 # ---------------------------------------------------------------------------
 # Helpers

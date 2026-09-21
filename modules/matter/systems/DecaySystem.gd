@@ -10,45 +10,93 @@ const _ContaminantComponent = preload("res://modules/matter/components/Contamina
 const _MaterialTypes        = preload("res://modules/matter/data/MaterialTypes.gd")
 const _TileTypes            = preload("res://modules/terrain/data/TileTypes.gd")
 
+const SLICE_COUNT: int = 100
+var _tile_slices: Array[PackedInt32Array] = []
+var _initialized_tiles: bool = false
+var _item_slices: Array[PackedInt32Array] = []
+var _cached_item_store_size: int = -1
+
 func initialize() -> void:
 	print("[DecaySystem] Initialized. Priority 190.")
 
-func tick(tick_number: int) -> void:
-	if tick_number % 300 != 0:
-		return
+func _init_tile_slices(matter_store: Dictionary) -> void:
+	_tile_slices.clear()
+	for i in range(SLICE_COUNT):
+		_tile_slices.append(PackedInt32Array())
+	var total_tiles: int = 128 * 128
+	if world != null:
+		total_tiles = world.MAP_WIDTH * world.MAP_HEIGHT
+	for eid: int in range(total_tiles):
+		var matter = matter_store.get(eid, null)
+		# Pre-filter: only slice tiles with positive rot rate
+		if matter != null and matter.rot_rate > 0.0:
+			_tile_slices[eid % SLICE_COUNT].append(eid)
+	_initialized_tiles = true
 
+func _rebuild_item_slices(item_store: Dictionary, matter_store: Dictionary) -> void:
+	_item_slices.clear()
+	for i in range(SLICE_COUNT):
+		_item_slices.append(PackedInt32Array())
+	for item_eid: int in item_store:
+		var matter = matter_store.get(item_eid, null)
+		# Only bucket items that can actually rot!
+		if matter != null and matter.rot_rate > 0.0:
+			_item_slices[item_eid % SLICE_COUNT].append(item_eid)
+	_cached_item_store_size = item_store.size()
+
+func tick(tick_number: int) -> void:
 	var reg = world.get_registry()
 	var matter_store: Dictionary = reg.get_store(&"MatterComponent")
-	var entity_ids: Array = matter_store.keys()
+	if matter_store.is_empty():
+		return
 
-	for matter_eid: int in entity_ids:
-		var matter = reg.get_component(matter_eid, &"MatterComponent")
-		if matter == null or matter.rot_rate <= 0.0:
-			continue
+	if not _initialized_tiles:
+		_init_tile_slices(matter_store)
 
-		# If this entity is an item inside a container, sync temperature and check container freezing
-		var item_comp = reg.get_component(matter_eid, &"ItemComponent")
-		if item_comp != null and item_comp.container_id != -1:
-			var container_matter = reg.get_component(item_comp.container_id, &"MatterComponent")
-			if container_matter != null:
-				matter.temperature_c = container_matter.temperature_c
-			if reg.has(item_comp.container_id, &"FrozenComponent"):
-				continue
+	var slice_mod: int = tick_number % SLICE_COUNT
 
-		# Freezing completely halts rot (Dwarf Fortress faithful)
-		if reg.has(matter_eid, &"FrozenComponent"):
-			continue
+	# 1. Check organic tiles in this slice (~10-15 tiles)
+	var tile_slice: PackedInt32Array = _tile_slices[slice_mod]
+	for matter_eid: int in tile_slice:
+		var matter = matter_store.get(matter_eid, null)
+		if matter != null and matter.rot_rate > 0.0:
+			_process_decay_entity(matter_eid, matter, reg)
 
-		# Temperature accelerates decay: 0.5x in cold, up to 2.0x in summer heat (40C)
-		var temp_ratio: float = clampf(matter.temperature_c / 40.0, 0.0, 1.0)
-		var temp_factor: float = lerpf(0.5, 2.0, temp_ratio)
-		var decay_amount: float = matter.rot_rate * temp_factor * 0.005
+	# 2. Check dynamic loose items that are perishable (pre-bucketed)
+	var item_store: Dictionary = reg.get_store(&"ItemComponent")
+	if not item_store.is_empty():
+		if _cached_item_store_size != item_store.size():
+			_rebuild_item_slices(item_store, matter_store)
+		var item_slice: PackedInt32Array = _item_slices[slice_mod]
+		for item_eid: int in item_slice:
+			var matter = matter_store.get(item_eid, null)
+			if matter != null and matter.rot_rate > 0.0:
+				_process_decay_entity(item_eid, matter, reg)
 
-		matter.moisture = maxf(0.0, matter.moisture - decay_amount * 0.3)
-		matter._decay_progress += decay_amount
+func _process_decay_entity(matter_eid: int, matter, reg) -> void:
+	# If this entity is an item inside a container, sync temperature and check container freezing
+	var item_comp = reg.get_component(matter_eid, &"ItemComponent")
+	if item_comp != null and item_comp.container_id != -1:
+		var container_matter = reg.get_component(item_comp.container_id, &"MatterComponent")
+		if container_matter != null:
+			matter.temperature_c = container_matter.temperature_c
+		if reg.has(item_comp.container_id, &"FrozenComponent"):
+			return
 
-		if matter._decay_progress >= 1.0:
-			_on_fully_decayed(matter_eid, matter, reg)
+	# Freezing completely halts rot (Dwarf Fortress faithful)
+	if reg.has(matter_eid, &"FrozenComponent"):
+		return
+
+	# Temperature accelerates decay: 0.5x in cold, up to 2.0x in summer heat (40C)
+	var temp_ratio: float = clampf(matter.temperature_c / 40.0, 0.0, 1.0)
+	var temp_factor: float = lerpf(0.5, 2.0, temp_ratio)
+	var decay_amount: float = matter.rot_rate * temp_factor * 0.005
+
+	matter.moisture = maxf(0.0, matter.moisture - decay_amount * 0.3)
+	matter._decay_progress += decay_amount
+
+	if matter._decay_progress >= 1.0:
+		_on_fully_decayed(matter_eid, matter, reg)
 
 func _on_fully_decayed(eid: int, matter, reg) -> void:
 	# Check if entity is an item
@@ -69,6 +117,8 @@ func _on_fully_decayed(eid: int, matter, reg) -> void:
 		matter._decay_progress = 0.0
 		if tile_comp != null:
 			tile_comp.tile_type = _TileTypes.Type.DIRT
+			if world != null and world.signals != null:
+				world.signals.notify_tile_type_changed(tile_comp.position, _TileTypes.Type.DIRT)
 			_update_render(eid, _TileTypes.Type.DIRT, reg)
 
 	elif mat_id in [_MaterialTypes.Type.WOOD_SOFT, _MaterialTypes.Type.WOOD_HARD]:
@@ -80,6 +130,8 @@ func _on_fully_decayed(eid: int, matter, reg) -> void:
 		matter._decay_progress = 0.0
 		if tile_comp != null:
 			tile_comp.tile_type = _TileTypes.Type.GROUND
+			if world != null and world.signals != null:
+				world.signals.notify_tile_type_changed(tile_comp.position, _TileTypes.Type.GROUND)
 			_update_render(eid, _TileTypes.Type.GROUND, reg)
 
 	elif mat_id == _MaterialTypes.Type.RAW_MEAT:
@@ -96,6 +148,8 @@ func _on_fully_decayed(eid: int, matter, reg) -> void:
 		matter._decay_progress = 0.0
 		if tile_comp != null:
 			tile_comp.tile_type = _TileTypes.Type.DIRT
+			if world != null and world.signals != null:
+				world.signals.notify_tile_type_changed(tile_comp.position, _TileTypes.Type.DIRT)
 			_update_render(eid, _TileTypes.Type.DIRT, reg)
 	else:
 		matter._decay_progress = 0.0

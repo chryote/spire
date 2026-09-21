@@ -29,6 +29,20 @@ var data: PackedFloat32Array
 ## Reusable secondary buffer for advection/diffusion to prevent mid-iteration feedback.
 var _scratch_data: PackedFloat32Array
 
+## True when channel contains non-zero signal data; skips full-grid scans when empty.
+var has_activity: bool = false
+
+## Sparse active tile tracking for DIFFUSE_DRIFT channels to avoid scanning 16K empty cells
+var _active_indices: PackedInt32Array = PackedInt32Array()
+var _in_active: PackedByteArray = PackedByteArray()
+
+func _mark_active_idx(idx: int) -> void:
+	has_activity = true
+	if propagation_type == _SignalTypes.PropagationType.DIFFUSE_DRIFT:
+		if _in_active.size() > idx and _in_active[idx] == 0:
+			_in_active[idx] = 1
+			_active_indices.append(idx)
+
 func _init(
 	p_name: StringName,
 	p_type: int = _SignalTypes.PropagationType.STATIC_SNAPSHOT,
@@ -51,6 +65,8 @@ func _init(
 	if propagation_type == _SignalTypes.PropagationType.DIFFUSE_DRIFT:
 		_scratch_data.resize(total_cells)
 		_scratch_data.fill(0.0)
+		_in_active.resize(total_cells)
+		_in_active.fill(0)
 
 # ===========================================================================
 # Direct Point Access (Normalized Intensity: 0.0 to 1.0)
@@ -65,16 +81,27 @@ func get_value(pos: Vector2i) -> float:
 ## Sets signal intensity at pos (clamped to [0.0, 1.0]).
 func set_value(pos: Vector2i, val: float) -> void:
 	if pos.x >= 0 and pos.x < width and pos.y >= 0 and pos.y < height:
-		data[pos.y * width + pos.x] = clampf(val, 0.0, 1.0)
+		var cval: float = clampf(val, 0.0, 1.0)
+		var idx: int = pos.y * width + pos.x
+		data[idx] = cval
+		if cval > 0.002:
+			_mark_active_idx(idx)
 
 func add_value(pos: Vector2i, val: float) -> void:
 	if pos.x >= 0 and pos.x < width and pos.y >= 0 and pos.y < height:
 		var idx: int = pos.y * width + pos.x
 		data[idx] = clampf(data[idx] + val, 0.0, 1.0)
+		if data[idx] > 0.002:
+			_mark_active_idx(idx)
 
 ## Reset all cells in the grid to a specific scalar value (e.g. 0.0).
 func fill(val: float) -> void:
-	data.fill(clampf(val, 0.0, 1.0))
+	var cval: float = clampf(val, 0.0, 1.0)
+	data.fill(cval)
+	has_activity = (cval > 0.0)
+	_active_indices.clear()
+	if _in_active.size() > 0:
+		_in_active.fill(0)
 
 # ===========================================================================
 # Radial Impulse (Acoustics, Explosions, Scent Puffs)
@@ -104,6 +131,8 @@ func add_impulse(center: Vector2i, intensity: float, radius: int) -> void:
 				var falloff: float = 1.0 - (dist * inv_r)
 				var idx: int = row_idx + x
 				data[idx] = clampf(data[idx] + intensity * falloff, 0.0, 1.0)
+				if data[idx] > 0.002:
+					_mark_active_idx(idx)
 
 # ===========================================================================
 # Spatial Query & Utility Gradient Helpers
@@ -155,9 +184,9 @@ func sample_highest_in_radius(center: Vector2i, radius: int) -> Vector2i:
 func decay_and_advect(wind_dir: Vector2, wind_strength: float) -> void:
 	if propagation_type != _SignalTypes.PropagationType.DIFFUSE_DRIFT:
 		return
-
-	var total_cells: int = width * height
-	_scratch_data.fill(0.0)
+	if not has_activity or _active_indices.is_empty():
+		has_activity = false
+		return
 
 	var wind_bias: Vector2 = wind_dir.normalized() * clampf(wind_strength, 0.0, 1.0)
 	var w_east: float  = maxf(0.0, 0.25 + wind_bias.x * 0.2)
@@ -171,34 +200,62 @@ func decay_and_advect(wind_dir: Vector2, wind_strength: float) -> void:
 		w_south /= total_w
 		w_north /= total_w
 
-	for y in range(height):
-		var row_idx: int = y * width
-		for x in range(width):
-			var val: float = data[row_idx + x]
-			if val <= 0.005:
-				continue
+	var touched_indices: PackedInt32Array = PackedInt32Array()
+	var next_active: PackedInt32Array = PackedInt32Array()
 
-			# 1. Decay
-			var decayed_val: float = val * decay_rate
-			if decayed_val <= 0.002:
-				continue
+	# 1. Diffuse and decay only from active cells
+	for idx: int in _active_indices:
+		var val: float = data[idx]
+		if val <= 0.005:
+			continue
 
-			# 2. Diffusion / Spread
-			var diffused_portion: float = decayed_val * diffusion_rate
-			var retained_portion: float = decayed_val - diffused_portion
+		var decayed_val: float = val * decay_rate
+		if decayed_val <= 0.002:
+			continue
 
-			_scratch_data[row_idx + x] += retained_portion
+		var diffused_portion: float = decayed_val * diffusion_rate
+		var retained_portion: float = decayed_val - diffused_portion
 
-			# Spread to 4 neighbors with wind-biased weights
-			if x + 1 < width:
-				_scratch_data[row_idx + (x + 1)] += diffused_portion * w_east
-			if x - 1 >= 0:
-				_scratch_data[row_idx + (x - 1)] += diffused_portion * w_west
-			if y + 1 < height:
-				_scratch_data[(y + 1) * width + x] += diffused_portion * w_south
-			if y - 1 >= 0:
-				_scratch_data[(y - 1) * width + x] += diffused_portion * w_north
+		if _scratch_data[idx] == 0.0:
+			touched_indices.append(idx)
+		_scratch_data[idx] += retained_portion
 
-	# Swap scratch into primary data with clamping
-	for i in range(total_cells):
-		data[i] = clampf(_scratch_data[i], 0.0, 1.0)
+		var x: int = idx % width
+		var y: int = floori(float(idx) / float(width))
+
+		if x + 1 < width:
+			var n_idx: int = idx + 1
+			if _scratch_data[n_idx] == 0.0: touched_indices.append(n_idx)
+			_scratch_data[n_idx] += diffused_portion * w_east
+		if x - 1 >= 0:
+			var n_idx: int = idx - 1
+			if _scratch_data[n_idx] == 0.0: touched_indices.append(n_idx)
+			_scratch_data[n_idx] += diffused_portion * w_west
+		if y + 1 < height:
+			var n_idx: int = idx + width
+			if _scratch_data[n_idx] == 0.0: touched_indices.append(n_idx)
+			_scratch_data[n_idx] += diffused_portion * w_south
+		if y - 1 >= 0:
+			var n_idx: int = idx - width
+			if _scratch_data[n_idx] == 0.0: touched_indices.append(n_idx)
+			_scratch_data[n_idx] += diffused_portion * w_north
+
+	# 2. Reset old active markers & clear data at previous active cells
+	for idx: int in _active_indices:
+		_in_active[idx] = 0
+		data[idx] = 0.0
+
+	# 3. Write back touched cells into primary data & build next active list
+	for idx: int in touched_indices:
+		var s_val: float = _scratch_data[idx]
+		_scratch_data[idx] = 0.0
+		if s_val > 0.002:
+			data[idx] = s_val
+			if _in_active[idx] == 0:
+				_in_active[idx] = 1
+				next_active.append(idx)
+		else:
+			data[idx] = 0.0
+
+	_active_indices = next_active
+	has_activity = not _active_indices.is_empty()

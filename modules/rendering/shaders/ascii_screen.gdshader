@@ -13,7 +13,7 @@ uniform vec2 cloud_dir;   // normalised cardinal direction set by ClimateSystem 
 
 const vec2 GRID_SIZE = vec2(128.0, 128.0);
 const vec2 ATLAS_GRID = vec2(16.0, 16.0);
-const float SWAY_THRESHOLD = 0.15;
+const float SWAY_THRESHOLD = 0.08;
 const float WAVE_FREQ = 0.10;
 const float WAVE_SPEED = 0.50;
 
@@ -123,17 +123,17 @@ void fragment() {
 
 	// Wind wave animation
 	float chosen_glyph = base_glyph;
-	if (wind_strength > 0.05 && sway_factor > 0.0) {
+	if (wind_strength > 0.03 && sway_factor > 0.0) {
 		float phase = dot(tile_pos, wind_dir) * WAVE_FREQ;
-		float wave = sin(phase - time_sec * wind_strength * WAVE_SPEED) * wind_strength;
+		float wave = sin(phase - time_sec * max(0.4, wind_strength * 1.5) * WAVE_SPEED) * clamp(wind_strength * 1.8, 0.25, 1.0);
 		float effective = wave * sway_factor;
 		if (effective > SWAY_THRESHOLD) {
 			if (sway_glyph > 0.0) {
 				chosen_glyph = sway_glyph;
 			}
-			fg_col.rgb = mix(fg_col.rgb, vec3(1.0), effective * 0.22);
-		} else if (effective < -SWAY_THRESHOLD * 0.8) {
-			fg_col.rgb = mix(fg_col.rgb, vec3(0.0), abs(effective) * 0.12);
+			fg_col.rgb = mix(fg_col.rgb, vec3(1.0), effective * 0.25);
+		} else if (effective < -SWAY_THRESHOLD * 0.7) {
+			fg_col.rgb = mix(fg_col.rgb, vec3(0.0), abs(effective) * 0.15);
 		}
 	}
 

@@ -16,6 +16,7 @@ const _SignalGrid            = preload("res://modules/signal/data/SignalGrid.gd"
 const _MaterialTypes         = preload("res://modules/matter/data/MaterialTypes.gd")
 const _TileTypes             = preload("res://modules/terrain/data/TileTypes.gd")
 const _VegetationTypes       = preload("res://modules/vegetation/data/VegetationTypes.gd")
+const _InventoryComponent    = preload("res://modules/item/components/InventoryComponent.gd")
 
 ## Registry of all active channels: StringName -> SignalGrid
 var _channels: Dictionary = {}
@@ -26,6 +27,17 @@ var _custom_providers: Array[Callable] = []
 
 ## 64-bit affordance bitmask per tile (width x height).
 var affordance_map: PackedInt64Array
+
+## Pre-cached static terrain baseline buffers to eliminate 16,384 GDScript iterations per tick
+var _base_trav_cache:       PackedFloat32Array = PackedFloat32Array()
+var _base_affordance_cache: PackedInt64Array   = PackedInt64Array()
+var _terrain_cache_ready:   bool               = false
+
+## Pre-cached static vegetation baseline buffers to eliminate 12,000 GDScript iterations per tick
+var _cached_food_plant:       PackedFloat32Array = PackedFloat32Array()
+var _cached_cover:            PackedFloat32Array = PackedFloat32Array()
+var _combined_affordance_map: PackedInt64Array   = PackedInt64Array()
+var _veg_cache_ready:         bool               = false
 
 var _width: int = 128
 var _height: int = 128
@@ -63,6 +75,63 @@ func initialize() -> void:
 
 	print("[SignalSystem] Initialized with %d channels (%dx%d). Priority 220." % [_channels.size(), _width, _height])
 
+## Event-driven O(1) cache update when a tile's terrain type changes dynamically.
+## Prevents stale signal data without requiring a 16,384-tile loop on every tick.
+func notify_tile_type_changed(pos: Vector2i, new_tile_type: int) -> void:
+	if not _terrain_cache_ready:
+		_build_terrain_cache()
+	var idx: int = pos.y * _width + pos.x
+	if idx < 0 or idx >= _total_tiles:
+		return
+
+	match new_tile_type:
+		_TileTypes.Type.MUD:
+			_base_trav_cache[idx] = 0.6
+			_base_affordance_cache[idx] = _TileAffordance.WALKABLE | _TileAffordance.HAZARD_SLOW
+		_TileTypes.Type.STONE:
+			_base_trav_cache[idx] = 0.9
+			_base_affordance_cache[idx] = _TileAffordance.WALKABLE
+		_:
+			_base_trav_cache[idx] = 1.0
+			_base_affordance_cache[idx] = _TileAffordance.WALKABLE
+
+	if _combined_affordance_map.size() > idx:
+		_combined_affordance_map[idx] = _base_affordance_cache[idx]
+
+	if world != null:
+		world.mark_render_dirty()
+
+func _build_terrain_cache() -> void:
+	if world == null:
+		return
+	var reg = world.get_registry()
+	if reg == null:
+		return
+	var tile_store: Dictionary = reg.get_store(&"TileComponent")
+	if tile_store.is_empty():
+		return
+
+	_base_trav_cache.resize(_total_tiles)
+	_base_trav_cache.fill(1.0)
+	_base_affordance_cache.resize(_total_tiles)
+	_base_affordance_cache.fill(_TileAffordance.WALKABLE)
+
+	for eid: int in tile_store:
+		var tile = tile_store[eid]
+		var idx: int = tile.position.y * _width + tile.position.x
+		if idx >= 0 and idx < _total_tiles:
+			match tile.tile_type:
+				_TileTypes.Type.MUD:
+					_base_trav_cache[idx] = 0.6
+					_base_affordance_cache[idx] = _TileAffordance.WALKABLE | _TileAffordance.HAZARD_SLOW
+				_TileTypes.Type.STONE:
+					_base_trav_cache[idx] = 0.9
+					_base_affordance_cache[idx] = _TileAffordance.WALKABLE
+				_:
+					_base_trav_cache[idx] = 1.0
+					_base_affordance_cache[idx] = _TileAffordance.WALKABLE
+	_terrain_cache_ready = true
+
 func tick(_tick_number: int) -> void:
 	var reg = world.get_registry()
 
@@ -71,16 +140,13 @@ func tick(_tick_number: int) -> void:
 		if ch.propagation_type == _SignalTypes.PropagationType.TRANSIENT:
 			ch.fill(0.0)
 
-	# 2. Reset static snapshot channels and default affordance map
+	# 2. Reset static snapshot channels (traversability, vegetation, and affordance restored in step 3 via memcpy)
 	for ch in _channels.values():
 		if ch.propagation_type == _SignalTypes.PropagationType.STATIC_SNAPSHOT:
-			if ch.name == _SignalTypes.TRAVERSABILITY:
-				ch.fill(1.0)
-			else:
+			if ch.name != _SignalTypes.TRAVERSABILITY and ch.name != _SignalTypes.FOOD_PLANT and ch.name != _SignalTypes.COVER:
 				ch.fill(0.0)
-	affordance_map.fill(_TileAffordance.WALKABLE)
 
-	# 3. Built-in physical simulation providers
+	# 3. Built-in physical simulation providers (starts with instant base terrain copy)
 	_sample_terrain_and_traversability(reg)
 	_sample_hazards(reg)
 	_sample_fluids(reg)
@@ -201,30 +267,23 @@ func emit_impulse(channel_name: StringName, pos: Vector2i, intensity: float, rad
 # ===========================================================================
 
 func _sample_terrain_and_traversability(reg) -> void:
+	if not _terrain_cache_ready:
+		_build_terrain_cache()
+	if not _veg_cache_ready:
+		_build_veg_cache(reg)
 	var trav_grid = _channels[_SignalTypes.TRAVERSABILITY]
-	var tile_store: Dictionary = reg.get_store(&"TileComponent")
-
-	for eid: int in tile_store.keys():
-		var tile = tile_store[eid]
-		var idx: int = tile.position.y * _width + tile.position.x
-
-		match tile.tile_type:
-			_TileTypes.Type.MUD:
-				trav_grid.data[idx] = 0.6
-				affordance_map[idx] |= _TileAffordance.HAZARD_SLOW
-			_TileTypes.Type.STONE:
-				trav_grid.data[idx] = 0.9
-			_:
-				trav_grid.data[idx] = 1.0
+	trav_grid.data = _base_trav_cache.duplicate()
+	affordance_map = _combined_affordance_map.duplicate()
 
 func _sample_hazards(reg) -> void:
 	var hazard_grid = _channels[_SignalTypes.HAZARD]
+	var tile_store: Dictionary = reg.get_store(&"TileComponent")
 
 	# 1. Fire / Combustion
 	var burn_store: Dictionary = reg.get_store(&"BurningComponent")
-	for eid: int in burn_store.keys():
+	for eid: int in burn_store:
 		var burning = burn_store[eid]
-		var tile = reg.get_component(eid, &"TileComponent")
+		var tile = tile_store.get(eid, null)
 		if tile != null:
 			var idx: int = tile.position.y * _width + tile.position.x
 			hazard_grid.data[idx] = maxf(hazard_grid.data[idx], burning.intensity)
@@ -236,12 +295,12 @@ func _sample_hazards(reg) -> void:
 
 	# 2. Toxic Gas
 	var gas_store: Dictionary = reg.get_store(&"GasComponent")
-	for eid: int in gas_store.keys():
+	for eid: int in gas_store:
 		var gas = gas_store[eid]
 		var mat_data: Dictionary = _MaterialTypes.get_data(gas.material_id)
 		var toxicity: float = mat_data.get("toxicity", 0.0) as float
 		if toxicity > 0.0:
-			var tile = reg.get_component(eid, &"TileComponent")
+			var tile = tile_store.get(eid, null)
 			if tile != null:
 				var idx: int = tile.position.y * _width + tile.position.x
 				var hazard_level: float = clampf(toxicity * gas.concentration, 0.0, 1.0)
@@ -251,9 +310,9 @@ func _sample_hazards(reg) -> void:
 
 	# 3. Chemical Contaminants (acid/miasma)
 	var contam_store: Dictionary = reg.get_store(&"ContaminantComponent")
-	for eid: int in contam_store.keys():
+	for eid: int in contam_store:
 		var contam = contam_store[eid]
-		var tile = reg.get_component(eid, &"TileComponent")
+		var tile = tile_store.get(eid, null)
 		if tile != null:
 			var idx: int = tile.position.y * _width + tile.position.x
 			var tox_corr: float = clampf(contam.toxicity + contam.corrosion, 0.0, 1.0)
@@ -261,13 +320,15 @@ func _sample_hazards(reg) -> void:
 			if tox_corr >= 0.5:
 				affordance_map[idx] |= _TileAffordance.HAZARD_LETHAL
 
-	# 4. Thermodynamic Extreme Temperatures
-	var matter_store: Dictionary = reg.get_store(&"MatterComponent")
-	for eid: int in matter_store.keys():
-		var matter = matter_store[eid]
-		if matter.temperature_c > 65.0 or matter.temperature_c < -25.0:
-			var tile = reg.get_component(eid, &"TileComponent")
-			if tile != null:
+	# 4. Thermodynamic Extreme Temperatures (sampled on Rare Ticks or severe seasonal weather)
+	# Note: Local combustion fires are already sampled above in step 1 via burn_store.
+	# Scan tile entities only (loose items in containers do not define terrain hazard cells)
+	if world != null and (world.is_rare_tick() or absf(world.season_temp_mod) > 0.7):
+		var matter_store: Dictionary = reg.get_store(&"MatterComponent")
+		for eid: int in tile_store:
+			var matter = matter_store.get(eid, null)
+			if matter != null and (matter.temperature_c > 65.0 or matter.temperature_c < -25.0):
+				var tile = tile_store[eid]
 				var idx: int = tile.position.y * _width + tile.position.x
 				var temp_hazard: float = 0.0
 				if matter.temperature_c > 65.0:
@@ -282,10 +343,11 @@ func _sample_fluids(reg) -> void:
 	var hydra_grid = _channels[_SignalTypes.HYDRATION]
 	var trav_grid  = _channels[_SignalTypes.TRAVERSABILITY]
 	var fluid_store: Dictionary = reg.get_store(&"FluidComponent")
+	var tile_store:  Dictionary = reg.get_store(&"TileComponent")
 
-	for eid: int in fluid_store.keys():
+	for eid: int in fluid_store:
 		var fluid = fluid_store[eid]
-		var tile = reg.get_component(eid, &"TileComponent")
+		var tile = tile_store.get(eid, null)
 		if tile == null:
 			continue
 		var idx: int = tile.position.y * _width + tile.position.x
@@ -311,72 +373,101 @@ func _sample_fluids(reg) -> void:
 			affordance_map[idx] |= _TileAffordance.HAZARD_LETHAL
 			affordance_map[idx] &= ~_TileAffordance.WALKABLE
 
-func _sample_vegetation(reg) -> void:
-	var plant_food_grid = _channels[_SignalTypes.FOOD_PLANT]
-	var cover_grid      = _channels[_SignalTypes.COVER]
-	var veg_store: Dictionary = reg.get_store(&"VegetationComponent")
+func _build_veg_cache(reg) -> void:
+	if not _terrain_cache_ready:
+		_build_terrain_cache()
 
-	for eid: int in veg_store.keys():
+	if _cached_food_plant.size() != _total_tiles:
+		_cached_food_plant.resize(_total_tiles)
+		_cached_cover.resize(_total_tiles)
+		_combined_affordance_map.resize(_total_tiles)
+
+	_cached_food_plant.fill(0.0)
+	_cached_cover.fill(0.0)
+	_combined_affordance_map = _base_affordance_cache.duplicate()
+
+	var veg_store:  Dictionary = reg.get_store(&"VegetationComponent")
+	var tile_store: Dictionary = reg.get_store(&"TileComponent")
+
+	for eid: int in veg_store:
 		var veg = veg_store[eid]
-		var tile = reg.get_component(eid, &"TileComponent")
+		var tile = tile_store.get(eid, null)
 		if tile == null:
 			continue
 		var idx: int = tile.position.y * _width + tile.position.x
+		if idx < 0 or idx >= _total_tiles:
+			continue
 
 		# Edible plant nutrition for herbivores
 		if veg.growth_stage >= 1:
 			var food_val: float = float(veg.growth_stage) / 3.0
-			plant_food_grid.data[idx] = food_val
-			affordance_map[idx] |= _TileAffordance.GRAZEABLE
+			_cached_food_plant[idx] = food_val
+			_combined_affordance_map[idx] |= _TileAffordance.GRAZEABLE
 
 		# Cover / Concealment
 		match veg.veg_type:
 			_VegetationTypes.Type.PINE_TREE, _VegetationTypes.Type.OAK_TREE:
-				cover_grid.data[idx] = 1.0
-				affordance_map[idx] |= _TileAffordance.COVER
+				_cached_cover[idx] = 1.0
+				_combined_affordance_map[idx] |= _TileAffordance.COVER
 			_VegetationTypes.Type.SHRUB:
-				cover_grid.data[idx] = 0.7
-				affordance_map[idx] |= _TileAffordance.COVER
+				_cached_cover[idx] = 0.7
+				_combined_affordance_map[idx] |= _TileAffordance.COVER
 			_VegetationTypes.Type.TALL_GRASS:
-				cover_grid.data[idx] = 0.4
-				affordance_map[idx] |= _TileAffordance.COVER
+				_cached_cover[idx] = 0.4
+				_combined_affordance_map[idx] |= _TileAffordance.COVER
+
+	_veg_cache_ready = true
+
+func _sample_vegetation(reg) -> void:
+	if not _veg_cache_ready or (world != null and world.is_rare_tick()):
+		_build_veg_cache(reg)
+
+	var plant_food_grid = _channels[_SignalTypes.FOOD_PLANT]
+	var cover_grid      = _channels[_SignalTypes.COVER]
+	plant_food_grid.data = _cached_food_plant.duplicate()
+	cover_grid.data = _cached_cover.duplicate()
 
 func _sample_inventory_items(reg) -> void:
-	var meat_food_grid = _channels[_SignalTypes.FOOD_MEAT]
 	var inv_store: Dictionary = reg.get_store(&"InventoryComponent")
+	if inv_store.is_empty():
+		return
 
-	for eid: int in inv_store.keys():
-		var inv = inv_store[eid]
+	var meat_food_grid = _channels[_SignalTypes.FOOD_MEAT]
+	var tile_store: Dictionary = reg.get_store(&"TileComponent")
+
+	for container_id: int in inv_store:
+		var inv = inv_store[container_id]
 		if inv.items.is_empty():
 			continue
 
-		var tile = reg.get_component(eid, &"TileComponent")
+		# Lazy cache initialization if directly populated
+		if not inv.has_carnivore_food and not inv.has_blood_scent and inv.max_calories == 0:
+			inv.update_cache(reg)
+
+		if not inv.has_carnivore_food and not inv.has_blood_scent:
+			continue
+
+		var tile = tile_store.get(container_id, null)
 		if tile == null:
 			continue
 		var idx: int = tile.position.y * _width + tile.position.x
 
-		for item_eid: int in inv.items:
-			var item = reg.get_component(item_eid, &"ItemComponent")
-			if item == null:
-				continue
+		if inv.has_carnivore_food and inv.max_calories > 0:
+			meat_food_grid.data[idx] = clampf(float(inv.max_calories) / 1000.0, 0.1, 1.0)
+			affordance_map[idx] |= _TileAffordance.CARNIVORE_FOOD
 
-			var mat_data: Dictionary = _MaterialTypes.get_data(item.material_type)
-			var cal: int = mat_data.get("nutritional_value", 0) as int
-			if cal > 0:
-				meat_food_grid.data[idx] = clampf(float(cal) / 1000.0, 0.1, 1.0)
-				affordance_map[idx] |= _TileAffordance.CARNIVORE_FOOD
-
-				# Raw meat emits blood/meat scent downwind
-				if item.material_type == _MaterialTypes.Type.RAW_MEAT:
-					emit_scent(_SignalTypes.SCENT_BLOOD, tile.position, 0.6, 1)
+		# Meat emits blood scent downwind
+		if inv.has_blood_scent:
+			emit_scent(_SignalTypes.SCENT_BLOOD, tile.position, 0.6, 1)
 
 func _process_signal_emitters(reg) -> void:
 	var emitter_store: Dictionary = reg.get_store(&"SignalEmitterComponent")
-	for eid: int in emitter_store.keys():
+	var tile_store:    Dictionary = reg.get_store(&"TileComponent")
+	for eid: int in emitter_store:
 		var emitter = emitter_store[eid]
 		if not emitter.enabled or emitter.channel.is_empty():
 			continue
 
-		var tile = reg.get_component(eid, &"TileComponent")
+		var tile = tile_store.get(eid, null)
 		if tile != null:
 			broadcast_signal(emitter.channel, tile.position, emitter.intensity, emitter.radius)

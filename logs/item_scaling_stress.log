@@ -1,0 +1,24 @@
+=================================================================
+       STARTING HIGH-VOLUME ITEM SCALING STRESS BENCHMARK        
+=================================================================
+
+[Test 1] Stacking and Mass Scaling...
+  -> PASSED: 50 items collapsed into 1 entity stack with quantity 50.
+  -> PASSED: Stack overflow (64 cap) properly created a second stack (16 qty).
+
+[Test 2] O(1) Global Count Tracking...
+  -> PASSED: Global counts incremented on creation and decremented on entity destruction in O(1).
+
+[Test 3] High-Volume Simulation Timings (10,000+ Items)...
+  Spawning 10,000 items across 100 map tiles...
+  Total items currently tracked in world: 10180
+  Benchmarking 20 ticks across simulation systems...
+  -> Completed 20 ticks in 340.56 ms (Average tick: 17.028 ms)
+  -> PASSED: High-volume simulation operates well within 100ms real-time budget.
+
+[Test 4] Tile Burnout Cleanup Under Stacked Items...
+  -> PASSED: Single-pass burnout cleanly consumed stacked items without errors.
+
+=================================================================
+>>> ALL ITEM SCALING BENCHMARKS & STRESS TESTS PASSED! <<<
+=================================================================

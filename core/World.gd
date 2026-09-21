@@ -20,6 +20,7 @@ extends Node
 const _ComponentRegistry  = preload("res://core/ComponentRegistry.gd")
 const _SystemBase         = preload("res://core/SystemBase.gd")
 const _Query              = preload("res://core/Query.gd")
+const _ItemFactory        = preload("res://modules/item/systems/ItemFactory.gd")
 
 const _TerrainGenSystem      = preload("res://modules/terrain/systems/TerrainGenSystem.gd")
 const _ClimateSystem         = preload("res://modules/weather/systems/ClimateSystem.gd")
@@ -93,6 +94,22 @@ var cloud_direction: Vector2 = Vector2(0.0, -1.0)
 # ---------------------------------------------------------------------------
 # Turn-tick configuration
 # ---------------------------------------------------------------------------
+# Multi-Tier Ticking Configuration (RimWorld / Dwarf Fortress-exact)
+# ---------------------------------------------------------------------------
+## Rare tick interval: plant growth, item yields, decay, material temperature (~2s at 10 TPS)
+const RARE_TICK_INTERVAL: int = 20
+## Long tick interval: seasonal climate updates across 16,384 tiles (~5s at 10 TPS)
+const LONG_TICK_INTERVAL: int = 50
+
+func is_rare_tick(tick: int = -1) -> bool:
+	var t: int = tick if tick >= 0 else tick_count
+	return t % RARE_TICK_INTERVAL == 0
+
+func is_long_tick(tick: int = -1) -> bool:
+	var t: int = tick if tick >= 0 else tick_count
+	return t % LONG_TICK_INTERVAL == 0
+
+# ---------------------------------------------------------------------------
 ## Simulation ticks per real-world second.
 var ticks_per_second: float = 10.0
 ## Pause the simulation without unloading anything.
@@ -123,6 +140,37 @@ var signals = null
 signal tick_processed(tick_number: int)
 ## Emitted once after all systems have been initialized.
 signal world_ready()
+## Emitted when terrain or render components change and textures should be re-baked.
+signal render_dirty()
+
+func mark_render_dirty() -> void:
+	emit_signal("render_dirty")
+
+# ---------------------------------------------------------------------------
+# Diagnostics & High-Precision System Profiling
+# ---------------------------------------------------------------------------
+var profiling_enabled: bool = false
+var _system_metrics: Dictionary = {}
+var _tick_timings_usec: Array = []
+var _max_tick_usec: int = 0
+var _total_tick_usec: int = 0
+
+func get_system_performance_data() -> Dictionary:
+	return {
+		"profiling_enabled": profiling_enabled,
+		"tick_count": tick_count,
+		"total_tick_usec": _total_tick_usec,
+		"max_tick_usec": _max_tick_usec,
+		"average_tick_usec": float(_total_tick_usec) / maxf(1.0, float(tick_count)),
+		"recent_ticks": _tick_timings_usec.duplicate(),
+		"systems": _system_metrics.duplicate(true)
+	}
+
+func reset_profiler() -> void:
+	_system_metrics.clear()
+	_tick_timings_usec.clear()
+	_max_tick_usec = 0
+	_total_tick_usec = 0
 
 # ===========================================================================
 # Godot lifecycle
@@ -134,13 +182,21 @@ func _ready() -> void:
 	_initialize_systems()
 	emit_signal("world_ready")
 
+const MAX_TICKS_PER_FRAME: int = 2
+
 func _process(delta: float) -> void:
 	if paused:
 		return
 	_tick_accumulator += delta
 	var interval: float = 1.0 / ticks_per_second
-	while _tick_accumulator >= interval:
+	# Prevent accumulator death spiral: cap accumulated catch-up time
+	if _tick_accumulator > interval * float(MAX_TICKS_PER_FRAME):
+		_tick_accumulator = interval * float(MAX_TICKS_PER_FRAME)
+
+	var ticks_run: int = 0
+	while _tick_accumulator >= interval and ticks_run < MAX_TICKS_PER_FRAME:
 		_tick_accumulator -= interval
+		ticks_run += 1
 		_run_tick()
 
 # ===========================================================================
@@ -149,9 +205,50 @@ func _process(delta: float) -> void:
 
 func _run_tick() -> void:
 	tick_count += 1
+	if not profiling_enabled:
+		for system in _sim_systems:
+			if system.enabled:
+				system.tick(tick_count)
+		emit_signal("tick_processed", tick_count)
+		return
+
+	# High-precision profiling active
+	var tick_start: int = Time.get_ticks_usec()
 	for system in _sim_systems:
-		if system.enabled:
-			system.tick(tick_count)
+		if not system.enabled:
+			continue
+		var sys_name: String = system.get_script().resource_path.get_file().get_basename()
+		var s_start: int = Time.get_ticks_usec()
+		system.tick(tick_count)
+		var s_duration: int = Time.get_ticks_usec() - s_start
+
+		var data = _system_metrics.get(sys_name, null)
+		if data == null:
+			data = {
+				"calls": 0,
+				"total_usec": 0,
+				"max_usec": 0,
+				"min_usec": 999999999,
+				"last_usec": 0
+			}
+			_system_metrics[sys_name] = data
+
+		data["calls"] += 1
+		data["total_usec"] += s_duration
+		data["last_usec"] = s_duration
+		if s_duration > data["max_usec"]:
+			data["max_usec"] = s_duration
+		if s_duration < data["min_usec"]:
+			data["min_usec"] = s_duration
+
+	var tick_total: int = Time.get_ticks_usec() - tick_start
+	_total_tick_usec += tick_total
+	if tick_total > _max_tick_usec:
+		_max_tick_usec = tick_total
+	_tick_timings_usec.append(tick_total)
+	if _tick_timings_usec.size() > 500:
+		_tick_timings_usec.pop_front()
+
 	emit_signal("tick_processed", tick_count)
 
 # ===========================================================================
@@ -232,6 +329,11 @@ func create_entity() -> int:
 	return id
 
 func destroy_entity(id: int) -> void:
+	# Synchronize item global count if entity is an item
+	var item = _registry.get_component(id, &"ItemComponent")
+	if item != null:
+		_ItemFactory.notify_item_destroyed(item.item_type, item.quantity)
+
 	# Clean up spatial index if entity has a tile
 	var tile = _registry.get_component(id, &"TileComponent")
 	if tile != null:

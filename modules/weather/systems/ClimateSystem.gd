@@ -102,42 +102,38 @@ func tick(tick_number: int) -> void:
 	var blend: float = smoothstep(0.80, 1.0, world.season_progress)
 	world.cloud_direction = cur_dir.slerp(next_dir, blend).normalized()
 
+	# --- Long Tick Gate: Update per-tile temperatures every 50 ticks (~5s) ---
+	# Ambient seasonal curves over 403,200 ticks change imperceptibly per second.
+	# Evaluating tiles on Long Tick cuts 98% of per-tick climate workload.
+	if tick_number > 1 and tick_number % 50 != 0:
+		return
+
 	# --- Update per-tile temperatures ---
-	# RainSystem (priority 6) applies its cooling ON TOP of this value,
-	# so we always reset from base first — UNLESS the tile or a neighbour
-	# is on fire, in which case we preserve the heat CombustionSystem set.
+	# RainSystem applies cooling on top; preserve fire heat.
 	var reg = world.get_registry()
 	var season_offset: float = world.season_temp_mod * SEASON_AMPLITUDE
 	var burning_store: Dictionary = reg.get_store(&"BurningComponent")
 	var has_any_fire: bool = not burning_store.is_empty()
 
-	# Pre-index burning positions if any fires exist to avoid 130k+ global entity lookups
-	var burning_positions: Dictionary = {}
+	# Pre-index entity IDs that are burning or adjacent to burning tiles
+	# Inverted check: only ~5-25 entities are protected, eliminating 65,536 neighbour lookups per tick.
+	var fire_protected_eids: Dictionary = {}
 	if has_any_fire:
 		for burning_eid: int in burning_store:
+			fire_protected_eids[burning_eid] = true
 			var b_tile = reg.get_component(burning_eid, &"TileComponent")
 			if b_tile != null:
-				burning_positions[b_tile.position] = true
+				for nb_offset: Vector2i in _NEIGHBOURS:
+					var nid: int = world.get_entity_at(b_tile.position + nb_offset)
+					if nid != -1:
+						fire_protected_eids[nid] = true
 
 	var biome_store: Dictionary = reg.get_store(&"BiomeComponent")
 	for entity_id: int in _base_temps:
-		var biome = biome_store.get(entity_id, null)
-		if biome == null:
+		if has_any_fire and fire_protected_eids.has(entity_id):
 			continue
 
-		# Check if this tile or any neighbour is burning (Q1-B)
-		var near_fire: bool = false
-		if has_any_fire:
-			if burning_store.has(entity_id):
-				near_fire = true
-			else:
-				var tile = reg.get_component(entity_id, &"TileComponent")
-				if tile != null:
-					for nb_offset: Vector2i in _NEIGHBOURS:
-						if burning_positions.has(tile.position + nb_offset):
-							near_fire = true
-							break
-
-		if not near_fire:
+		var biome = biome_store.get(entity_id, null)
+		if biome != null:
 			biome.temperature = clampf((_base_temps[entity_id] as float) + season_offset, 0.0, 1.0)
 

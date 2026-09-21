@@ -10,12 +10,16 @@ extends Camera2D
 
 const ZOOM_MIN:    float = 0.25
 const ZOOM_MAX:    float = 5.0
-const ZOOM_STEP:   float = 0.12
-const KEY_PAN_SPEED: float = 6.0  # pixels per frame at zoom 1.0
+const ZOOM_STEP:   float = 0.25
+const KEY_PAN_SPEED: float = 650.0  # pixels per second at zoom 1.0
+const SMOOTH_FACTOR: float = 24.0   # lerp response rate
 
 var _dragging: bool   = false
 var _drag_start: Vector2 = Vector2.ZERO
 var _cam_start:  Vector2 = Vector2.ZERO
+
+var _target_position: Vector2 = Vector2.ZERO
+var _target_zoom:     Vector2 = Vector2(1.5, 1.5)
 
 func _ready() -> void:
 	# Start centred on the map (128 × 128 tiles at 18×18 px each)
@@ -23,6 +27,8 @@ func _ready() -> void:
 	var cy: float = float(World.MAP_HEIGHT) * 18.0 * 0.5
 	position = Vector2(cx, cy)
 	zoom     = Vector2(1.5, 1.5)
+	_target_position = position
+	_target_zoom     = zoom
 
 func _input(event: InputEvent) -> void:
 	# --- Zoom via scroll wheel ---
@@ -40,14 +46,14 @@ func _input(event: InputEvent) -> void:
 			_dragging = mbe.pressed
 			if _dragging:
 				_drag_start = mbe.global_position
-				_cam_start  = position
+				_cam_start  = _target_position
 
 	if event is InputEventMouseMotion and _dragging:
 		var mme: InputEventMouseMotion = event as InputEventMouseMotion
-		position = _cam_start - (mme.global_position - _drag_start) / zoom
+		_target_position = _cam_start - (mme.global_position - _drag_start) / zoom
 
-func _process(_delta: float) -> void:
-	# --- Keyboard pan ---
+func _process(delta: float) -> void:
+	# --- Keyboard pan (delta-scaled) ---
 	var dir := Vector2.ZERO
 	if Input.is_action_pressed("ui_left")  or Input.is_key_pressed(KEY_A):
 		dir.x -= 1.0
@@ -57,9 +63,15 @@ func _process(_delta: float) -> void:
 		dir.y -= 1.0
 	if Input.is_action_pressed("ui_down")  or Input.is_key_pressed(KEY_S):
 		dir.y += 1.0
+
 	if dir != Vector2.ZERO:
-		position += dir * KEY_PAN_SPEED / zoom.x
+		_target_position += dir.normalized() * (KEY_PAN_SPEED * delta / _target_zoom.x)
+
+	# --- Smooth interpolation with exact exponential decay to eliminate VSync frame-pacing judder ---
+	var t: float = 1.0 - exp(-SMOOTH_FACTOR * delta)
+	position = position.lerp(_target_position, t)
+	zoom     = zoom.lerp(_target_zoom, t)
 
 func _adjust_zoom(delta: float) -> void:
-	var nz: float = clampf(zoom.x + delta, ZOOM_MIN, ZOOM_MAX)
-	zoom = Vector2(nz, nz)
+	var nz: float = clampf(_target_zoom.x + delta, ZOOM_MIN, ZOOM_MAX)
+	_target_zoom = Vector2(nz, nz)
