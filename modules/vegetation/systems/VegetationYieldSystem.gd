@@ -22,6 +22,19 @@ const GLOBAL_ITEM_CAPS: Dictionary = {
 }
 const DEFAULT_GLOBAL_ITEM_CAP: int = 100000
 
+## Maximum number of items of a specific archetype allowed on a single tile's inventory from vegetation yield.
+## Prevents a single tile from accumulating excessive items of a given type.
+const MAX_YIELD_PER_TILE: Dictionary = {
+	_ItemTypes.Type.GRASS: 1,
+	_ItemTypes.Type.STICK: 8,
+	_ItemTypes.Type.LOG:   2,
+}
+const DEFAULT_MAX_YIELD_PER_TILE: int = 5
+
+## Alias matching the naming convention of GLOBAL_ITEM_CAPS.
+const TILE_ITEM_CAPS: Dictionary = MAX_YIELD_PER_TILE
+const DEFAULT_TILE_ITEM_CAP: int = DEFAULT_MAX_YIELD_PER_TILE
+
 const SLICE_COUNT: int = 20
 var _slice_buckets: Array[PackedInt32Array] = []
 var _cached_store_size: int = -1
@@ -76,9 +89,15 @@ func tick(tick_number: int) -> void:
 			continue
 
 		# Enforce local tile max_yield cap: count total units of this archetype already on the tile
-		if yield_comp.max_yield >= 0:
+		var max_tile: int = MAX_YIELD_PER_TILE.get(yield_comp.item_type, DEFAULT_MAX_YIELD_PER_TILE)
+		if yield_comp.max_yield >= 0 and not MAX_YIELD_PER_TILE.has(yield_comp.item_type):
+			max_tile = yield_comp.max_yield
+		elif yield_comp.max_yield == -1:
+			max_tile = -1
+
+		if max_tile >= 0:
 			var existing_qty: int = inv.get_total_quantity_of_type(reg, yield_comp.item_type)
-			if existing_qty >= yield_comp.max_yield:
+			if existing_qty >= max_tile:
 				continue
 
 		# Deposit one item (ItemFactory handles stacking and O(1) global count updates)
@@ -93,6 +112,10 @@ func tick(tick_number: int) -> void:
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+## Returns the maximum yield per tile configured for the given item type.
+static func get_max_yield_per_tile(item_type: int) -> int:
+	return MAX_YIELD_PER_TILE.get(item_type, DEFAULT_MAX_YIELD_PER_TILE)
 
 ## Count how many units of an archetype exist in an inventory.
 func _count_items(inv: _InventoryComponent, item_type: int, reg) -> int:

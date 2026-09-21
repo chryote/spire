@@ -22,6 +22,9 @@ var has_carnivore_food: bool = false
 var max_calories: int = 0
 var has_blood_scent: bool = false
 
+## Entity ID of the container hosting this inventory (-1 if unassigned).
+var container_id: int = -1
+
 ## Return true when another item stack can be added.
 func has_space() -> bool:
 	return capacity < 0 or items.size() < capacity
@@ -54,6 +57,10 @@ func remove_item(item_entity_id: int) -> bool:
 	if idx == -1:
 		return false
 	items.remove_at(idx)
+	if items.is_empty() and container_id != -1:
+		var world_node = Engine.get_main_loop().root.get_node_or_null("/root/World") if Engine.get_main_loop() != null else null
+		if world_node != null and world_node.signals != null:
+			world_node.signals.unregister_active_inventory(container_id)
 	return true
 
 ## Clears all held item IDs and resets cached flags, returning the list of entity IDs.
@@ -63,6 +70,10 @@ func clear_items() -> Array[int]:
 	has_carnivore_food = false
 	max_calories = 0
 	has_blood_scent = false
+	if container_id != -1:
+		var world_node = Engine.get_main_loop().root.get_node_or_null("/root/World") if Engine.get_main_loop() != null else null
+		if world_node != null and world_node.signals != null:
+			world_node.signals.unregister_active_inventory(container_id)
 	return old_items
 
 ## Recalculates cached spatial perception flags for this inventory.

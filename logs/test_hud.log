@@ -1,6 +1,6 @@
 PASSED: HUD Monitor CanvasLayer initialized, toggled, and verified with live item counts, vegetation metrics, and system latencies in ms.
 Item Summary: Total Item Stacks: 1  |  Total Units (Quantity): 50
-Veg Summary:  Vegetated: 3,511 / 16,384 (21.4%)  |  Yield Plants: 3,178  |  Growth: 90%
+Veg Summary:  Vegetated: 3,489 / 16,384 (21.3%)  |  Yield Plants: 3,202  |  Growth: 90%
 Veg Breakdown:
-[b]Species:[/b] Grass: 2,817 • Tall Grass: 246 • Shrub: 88 • Wildflower: 49 • Pine: 207 • Oak: 165
-[b]Stages:[/b] Seedling: 1,297 • Young: 1,242 • Established: 1,033
+[b]Species:[/b] Grass: 2,846 • Tall Grass: 250 • Shrub: 71 • Wildflower: 41 • Pine: 190 • Oak: 165
+[b]Stages:[/b] Seedling: 1,184 • Young: 1,314 • Established: 1,065

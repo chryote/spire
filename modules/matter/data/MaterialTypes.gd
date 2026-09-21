@@ -290,7 +290,7 @@ const DATA: Dictionary = {
 		"melting_point_c": INF, "boiling_point_c": INF,
 		"ignition_temp_c": 220.0, "conductivity": 0.3, "specific_heat": 1800.0,
 		"flammability": 0.60, "acidity_ph": 6.0, "corrosiveness": 0.0,
-		"moisture": 0.55, "rot_rate": 0.45, "toxicity": 0.0,
+		"moisture": 0.55, "rot_rate": 0.7, "toxicity": 0.0,
 		"hardness": 0.5, "yield_strength": 3.0, "elasticity": 0.7,
 		"nutritional_value": 8,
 	},

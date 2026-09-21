@@ -47,6 +47,8 @@ class AtlasDrawer extends Node2D:
 				ch = "\u2593" # dark shade ▓
 			elif i == 219:
 				ch = "\u2588" # full block █
+			elif i == 247:
+				ch = "\u2248" # waves ≈
 			elif i >= 32 and i <= 126:
 				ch = String.chr(i)
 
@@ -384,6 +386,7 @@ static func _glyph_to_code(g: String) -> int:
 		0x2592: return 177 # medium shade ▒
 		0x2593: return 178 # dark shade ▓
 		0x2588: return 219 # full block █
+		0x2248: return 247 # waves ≈
 		_:      return 63  # '?'
 
 func _build_font() -> Font:

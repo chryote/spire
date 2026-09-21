@@ -41,6 +41,9 @@ func initialize() -> void:
 				0.5
 			)
 
+		if reg.has(entity_id, &"FluidComponent"):
+			matter.state = 1  # LIQUID
+
 		reg.add(entity_id, matter)
 		count += 1
 

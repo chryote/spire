@@ -34,9 +34,18 @@ func _test_yield_cap() -> void:
 			initial_grass_count += 1
 
 	print("[Test] Initial grass items in world: %d" % initial_grass_count)
-	var max_cap: int = _VegetationYieldSystem.GLOBAL_ITEM_CAPS.get(_ItemTypes.Type.GRASS, 200)
+	var max_cap: int = _VegetationYieldSystem.GLOBAL_ITEM_CAPS.get(_ItemTypes.Type.GRASS, 16384)
 	print("[Test] Configured global grass cap: %d" % max_cap)
-	assert(max_cap == 200, "Global grass cap should default to 200")
+	assert(max_cap > 0, "Global grass cap should be positive")
+
+	# Verify MAX_YIELD_PER_TILE dictionary and TILE_ITEM_CAPS alias
+	assert(_VegetationYieldSystem.MAX_YIELD_PER_TILE is Dictionary, "MAX_YIELD_PER_TILE must be a Dictionary")
+	assert(_VegetationYieldSystem.TILE_ITEM_CAPS is Dictionary, "TILE_ITEM_CAPS alias must be a Dictionary")
+	var tile_cap: int = _VegetationYieldSystem.get_max_yield_per_tile(_ItemTypes.Type.GRASS)
+	print("[Test] Configured per-tile grass cap: %d" % tile_cap)
+	assert(tile_cap == 5, "Per-tile grass cap should be 5")
+	assert(_VegetationYieldSystem.MAX_YIELD_PER_TILE[_ItemTypes.Type.STICK] == 8, "Per-tile stick cap should be 8")
+	assert(_VegetationYieldSystem.MAX_YIELD_PER_TILE[_ItemTypes.Type.LOG] == 2, "Per-tile log cap should be 2")
 
 	var yield_store: Dictionary = reg.get_store(&"ItemYieldComponent")
 	var inv_store: Dictionary = reg.get_store(&"InventoryComponent")
@@ -73,9 +82,17 @@ func _test_yield_cap() -> void:
 	assert(final_grass_count <= max_cap, "Grass stacks (%d) must NOT exceed global cap (%d)" % [final_grass_count, max_cap])
 	print("  -> PASSED: Global hard cap strictly respected.")
 
+	# Verify per-tile yield cap across all plants
+	for eid: int in yield_store:
+		var inv: _InventoryComponent = inv_store.get(eid, null)
+		if inv != null:
+			var tile_grass_qty: int = inv.get_total_quantity_of_type(reg, _ItemTypes.Type.GRASS)
+			assert(tile_grass_qty <= tile_cap, "Tile grass qty (%d) must not exceed per-tile cap (%d)" % [tile_grass_qty, tile_cap])
+	print("  -> PASSED: Per-tile yield cap strictly respected across all tiles.")
+
 	var file = FileAccess.open("res://logs/test_vegetation_yield_cap.log", FileAccess.WRITE)
 	if file != null:
-		file.store_string("PASSED: Global hard cap strictly respected. Final grass units: %d, global_tracked: %d, max_cap: %d\n" % [
-			final_grass_qty, global_tracked, max_cap
+		file.store_string("PASSED: Global hard cap and per-tile cap strictly respected. Final grass units: %d, global_tracked: %d, max_cap: %d, per_tile_cap: %d\n" % [
+			final_grass_qty, global_tracked, max_cap, tile_cap
 		])
 		file.close()

@@ -8,3 +8,6 @@ var position: Vector2i = Vector2i.ZERO
 
 ## One of TileTypes.Type — determines base visuals and vegetation eligibility.
 var tile_type: int = 0  # TileTypes.Type.GROUND
+
+## Pre-flood / pre-transition tile type (-1 means no pending restoration).
+var original_tile_type: int = -1

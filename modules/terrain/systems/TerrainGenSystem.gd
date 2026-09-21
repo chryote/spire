@@ -16,6 +16,8 @@ const _RenderComponent = preload("res://modules/rendering/components/RenderCompo
 const _TileTypes       = preload("res://modules/terrain/data/TileTypes.gd")
 const _BiomeTypes      = preload("res://modules/terrain/data/BiomeTypes.gd")
 const _InventoryComponent = preload("res://modules/item/components/InventoryComponent.gd")
+const _FluidComponent   = preload("res://modules/matter/components/FluidComponent.gd")
+const _MaterialTypes   = preload("res://modules/matter/data/MaterialTypes.gd")
 
 ## Change this to get a different world layout.
 var noise_seed: int = 42
@@ -71,17 +73,38 @@ func _generate() -> void:
 
 			# --- BiomeComponent ---
 			var biome = _BiomeComponent.new()
-			biome.biome       = biome_type
-			biome.moisture    = moisture
-			biome.temperature = temperature
+			biome.biome         = biome_type
+			biome.moisture      = moisture
+			biome.base_moisture = moisture
+			biome.temperature   = temperature
 			reg.add(entity_id, biome)
 
-			# --- RenderComponent (initial visual from tile type) ---
+			# --- Standing Water (Approach B: Dynamic Fluid Layer) ---
+			var is_water: bool = (height < -0.38)
+			var is_deep_water: bool = (height < -0.45)
+			if is_water:
+				var fluid = _FluidComponent.new()
+				fluid.material_id = _MaterialTypes.Type.WATER
+				fluid.settled     = true
+				fluid.volume      = 0.75 if is_deep_water else 0.25
+				reg.add(entity_id, fluid)
+
+			# --- RenderComponent (initial visual from water fluid or base tile) ---
 			var render = _RenderComponent.new()
-			var td: Dictionary = _TileTypes.get_data(tile_type)
-			render.glyph    = td["glyph"]
-			render.fg_color = td["fg_color"]
-			render.bg_color = td["bg_color"]
+			if is_water:
+				if is_deep_water:
+					render.glyph    = "\u2248" # waves ≈
+					render.fg_color = Color(0.25, 0.65, 1.0, 0.9)
+					render.bg_color = Color(0.04, 0.12, 0.28)
+				else:
+					render.glyph    = "~"      # ripples ~
+					render.fg_color = Color(0.35, 0.75, 1.0, 0.7)
+					render.bg_color = Color(0.06, 0.16, 0.32)
+			else:
+				var td: Dictionary = _TileTypes.get_data(tile_type)
+				render.glyph    = td["glyph"]
+				render.fg_color = td["fg_color"]
+				render.bg_color = td["bg_color"]
 			reg.add(entity_id, render)
 
 			# --- InventoryComponent (empty ground tile inventory) ---

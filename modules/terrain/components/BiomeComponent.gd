@@ -10,5 +10,8 @@ var biome: int = 0        # BiomeTypes.Type.PLAINS
 ## Moisture level 0.0 (arid) → 1.0 (saturated).
 var moisture: float = 0.5
 
+## Baseline moisture level from world generation (ambient target for drying/evaporation).
+var base_moisture: float = 0.5
+
 ## Temperature level 0.0 (freezing) → 1.0 (scorching).
 var temperature: float = 0.5

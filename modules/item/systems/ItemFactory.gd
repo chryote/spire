@@ -235,6 +235,8 @@ static func create_and_deposit(
 			if added > 0:
 				notify_item_created(item_type, added)
 				inv.update_cache(reg)
+				if world != null and world.signals != null:
+					world.signals.register_active_inventory(target_entity)
 			if overflow <= 0:
 				return existing_id
 			quantity = overflow
@@ -245,6 +247,8 @@ static func create_and_deposit(
 	var item_id: int = create(world, item_type, material_type, quantity)
 	_finalize_deposit(world, item_id, target_entity, inv)
 	inv.update_cache(reg)
+	if world != null and world.signals != null:
+		world.signals.register_active_inventory(target_entity)
 	return item_id
 
 ## Create a multi-material composite item entity and deposit it into an inventory.
@@ -276,6 +280,8 @@ static func create_composite_and_deposit(
 			if added > 0:
 				notify_item_created(item_type, added)
 				inv.update_cache(reg)
+				if world != null and world.signals != null:
+					world.signals.register_active_inventory(target_entity)
 			if overflow <= 0:
 				return existing_id
 			quantity = overflow
@@ -286,6 +292,8 @@ static func create_composite_and_deposit(
 	var item_id: int = create_composite(world, item_type, parts_materials, quantity)
 	_finalize_deposit(world, item_id, target_entity, inv)
 	inv.update_cache(reg)
+	if world != null and world.signals != null:
+		world.signals.register_active_inventory(target_entity)
 	return item_id
 
 static func _finalize_deposit(
@@ -304,6 +312,7 @@ static func _finalize_deposit(
 	if target_matter != null and item_matter != null:
 		item_matter.temperature_c = target_matter.temperature_c
 
+	inv.container_id = target_entity
 	inv.items.append(item_id)
 
 

@@ -29,15 +29,30 @@ var _custom_providers: Array[Callable] = []
 var affordance_map: PackedInt64Array
 
 ## Pre-cached static terrain baseline buffers to eliminate 16,384 GDScript iterations per tick
-var _base_trav_cache:       PackedFloat32Array = PackedFloat32Array()
-var _base_affordance_cache: PackedInt64Array   = PackedInt64Array()
-var _terrain_cache_ready:   bool               = false
+var _clean_trav_cache:       PackedFloat32Array = PackedFloat32Array()
+var _base_trav_cache:        PackedFloat32Array = PackedFloat32Array()
+var _base_affordance_cache:  PackedInt64Array   = PackedInt64Array()
+var _terrain_cache_ready:    bool               = false
 
 ## Pre-cached static vegetation baseline buffers to eliminate 12,000 GDScript iterations per tick
 var _cached_food_plant:       PackedFloat32Array = PackedFloat32Array()
 var _cached_cover:            PackedFloat32Array = PackedFloat32Array()
+var _veg_affordance_cache:    PackedInt64Array   = PackedInt64Array()
 var _combined_affordance_map: PackedInt64Array   = PackedInt64Array()
 var _veg_cache_ready:         bool               = false
+
+## Pre-cached static settled fluid baseline buffers to eliminate 1,300 fluid entity queries per tick
+var _cached_hydration:        PackedFloat32Array = PackedFloat32Array()
+var _fluid_cache_ready:       bool               = false
+var _cached_fluid_count:      int                = -1
+
+## Pre-cached static climate temperature hazard buffer to eliminate 16,384 tile iterations per tick
+var _cached_climate_hazard:   PackedFloat32Array = PackedFloat32Array()
+var _climate_lethal_indices:  PackedInt32Array   = PackedInt32Array()
+var _climate_hazard_ready:    bool               = false
+
+## Sparse active inventory tracking (container_id: int -> true)
+var _active_inventories:      Dictionary         = {}
 
 var _width: int = 128
 var _height: int = 128
@@ -73,6 +88,17 @@ func initialize() -> void:
 	register_channel(_SignalTypes.SCENT_BLOOD,    _SignalTypes.PropagationType.DIFFUSE_DRIFT, 0.93, 0.05)
 	register_channel(_SignalTypes.SCENT_SMOKE,    _SignalTypes.PropagationType.DIFFUSE_DRIFT, 0.90, 0.06)
 
+	# Seed active inventories from any pre-existing non-empty inventories
+	_active_inventories.clear()
+	if world != null:
+		var reg = world.get_registry()
+		if reg != null:
+			var inv_store: Dictionary = reg.get_store(&"InventoryComponent")
+			for cid: int in inv_store:
+				var inv = inv_store[cid]
+				if inv != null and not inv.items.is_empty():
+					_active_inventories[cid] = true
+
 	print("[SignalSystem] Initialized with %d channels (%dx%d). Priority 220." % [_channels.size(), _width, _height])
 
 ## Event-driven O(1) cache update when a tile's terrain type changes dynamically.
@@ -84,19 +110,34 @@ func notify_tile_type_changed(pos: Vector2i, new_tile_type: int) -> void:
 	if idx < 0 or idx >= _total_tiles:
 		return
 
+	var trav_val: float = 1.0
+	var aff_val: int = _TileAffordance.WALKABLE
+
 	match new_tile_type:
 		_TileTypes.Type.MUD:
-			_base_trav_cache[idx] = 0.6
-			_base_affordance_cache[idx] = _TileAffordance.WALKABLE | _TileAffordance.HAZARD_SLOW
+			trav_val = 0.6
+			aff_val = _TileAffordance.WALKABLE | _TileAffordance.HAZARD_SLOW
 		_TileTypes.Type.STONE:
-			_base_trav_cache[idx] = 0.9
-			_base_affordance_cache[idx] = _TileAffordance.WALKABLE
+			trav_val = 0.9
+			aff_val = _TileAffordance.WALKABLE
 		_:
-			_base_trav_cache[idx] = 1.0
-			_base_affordance_cache[idx] = _TileAffordance.WALKABLE
+			trav_val = 1.0
+			aff_val = _TileAffordance.WALKABLE
 
+	if _clean_trav_cache.size() > idx:
+		_clean_trav_cache[idx] = trav_val
+	if _base_trav_cache.size() > idx:
+		_base_trav_cache[idx] = trav_val
+	if _base_affordance_cache.size() > idx:
+		_base_affordance_cache[idx] = aff_val
+	if _veg_affordance_cache.size() > idx:
+		_veg_affordance_cache[idx] = aff_val
 	if _combined_affordance_map.size() > idx:
-		_combined_affordance_map[idx] = _base_affordance_cache[idx]
+		_combined_affordance_map[idx] = aff_val
+	if affordance_map.size() > idx:
+		affordance_map[idx] = aff_val
+	if _channels.has(_SignalTypes.TRAVERSABILITY):
+		_channels[_SignalTypes.TRAVERSABILITY].data[idx] = trav_val
 
 	if world != null:
 		world.mark_render_dirty()
@@ -111,6 +152,8 @@ func _build_terrain_cache() -> void:
 	if tile_store.is_empty():
 		return
 
+	_clean_trav_cache.resize(_total_tiles)
+	_clean_trav_cache.fill(1.0)
 	_base_trav_cache.resize(_total_tiles)
 	_base_trav_cache.fill(1.0)
 	_base_affordance_cache.resize(_total_tiles)
@@ -122,12 +165,15 @@ func _build_terrain_cache() -> void:
 		if idx >= 0 and idx < _total_tiles:
 			match tile.tile_type:
 				_TileTypes.Type.MUD:
+					_clean_trav_cache[idx] = 0.6
 					_base_trav_cache[idx] = 0.6
 					_base_affordance_cache[idx] = _TileAffordance.WALKABLE | _TileAffordance.HAZARD_SLOW
 				_TileTypes.Type.STONE:
+					_clean_trav_cache[idx] = 0.9
 					_base_trav_cache[idx] = 0.9
 					_base_affordance_cache[idx] = _TileAffordance.WALKABLE
 				_:
+					_clean_trav_cache[idx] = 1.0
 					_base_trav_cache[idx] = 1.0
 					_base_affordance_cache[idx] = _TileAffordance.WALKABLE
 	_terrain_cache_ready = true
@@ -140,10 +186,10 @@ func tick(_tick_number: int) -> void:
 		if ch.propagation_type == _SignalTypes.PropagationType.TRANSIENT:
 			ch.fill(0.0)
 
-	# 2. Reset static snapshot channels (traversability, vegetation, and affordance restored in step 3 via memcpy)
+	# 2. Reset static snapshot channels (restored in step 3 via memcpy from pre-cached buffers)
 	for ch in _channels.values():
 		if ch.propagation_type == _SignalTypes.PropagationType.STATIC_SNAPSHOT:
-			if ch.name != _SignalTypes.TRAVERSABILITY and ch.name != _SignalTypes.FOOD_PLANT and ch.name != _SignalTypes.COVER:
+			if ch.name != _SignalTypes.TRAVERSABILITY and ch.name != _SignalTypes.FOOD_PLANT and ch.name != _SignalTypes.COVER and ch.name != _SignalTypes.HYDRATION and ch.name != _SignalTypes.HAZARD:
 				ch.fill(0.0)
 
 	# 3. Built-in physical simulation providers (starts with instant base terrain copy)
@@ -205,6 +251,18 @@ func has_channel(channel_name: StringName) -> bool:
 func register_provider(provider_fn: Callable) -> void:
 	if not _custom_providers.has(provider_fn):
 		_custom_providers.append(provider_fn)
+
+# ===========================================================================
+# Sparse Active Inventory API
+# ===========================================================================
+
+## Register an entity as holding active items in its inventory.
+func register_active_inventory(container_id: int) -> void:
+	_active_inventories[container_id] = true
+
+## Unregister an entity whose inventory has been emptied.
+func unregister_active_inventory(container_id: int) -> void:
+	_active_inventories.erase(container_id)
 
 # ===========================================================================
 # Public Query & Perception API for Creature AI
@@ -271,13 +329,50 @@ func _sample_terrain_and_traversability(reg) -> void:
 		_build_terrain_cache()
 	if not _veg_cache_ready:
 		_build_veg_cache(reg)
+	var fluid_store: Dictionary = reg.get_store(&"FluidComponent")
+	if not _fluid_cache_ready or fluid_store.size() != _cached_fluid_count or (world != null and world.is_rare_tick()):
+		_build_fluid_cache(reg)
 	var trav_grid = _channels[_SignalTypes.TRAVERSABILITY]
 	trav_grid.data = _base_trav_cache.duplicate()
 	affordance_map = _combined_affordance_map.duplicate()
 
+func _build_climate_hazard_cache(reg) -> void:
+	if _cached_climate_hazard.size() != _total_tiles:
+		_cached_climate_hazard.resize(_total_tiles)
+	_cached_climate_hazard.fill(0.0)
+	_climate_lethal_indices.clear()
+
+	var tile_store: Dictionary   = reg.get_store(&"TileComponent")
+	var matter_store: Dictionary = reg.get_store(&"MatterComponent")
+
+	for eid: int in tile_store:
+		var matter = matter_store.get(eid, null)
+		if matter != null and (matter.temperature_c > 65.0 or matter.temperature_c < -25.0):
+			var tile = tile_store[eid]
+			var idx: int = tile.position.y * _width + tile.position.x
+			var temp_hazard: float = 0.0
+			if matter.temperature_c > 65.0:
+				temp_hazard = clampf((matter.temperature_c - 65.0) / 40.0, 0.2, 1.0)
+			else:
+				temp_hazard = clampf((-25.0 - matter.temperature_c) / 30.0, 0.2, 1.0)
+			_cached_climate_hazard[idx] = temp_hazard
+			if temp_hazard >= 0.7:
+				_climate_lethal_indices.append(idx)
+
+	_climate_hazard_ready = true
+
 func _sample_hazards(reg) -> void:
 	var hazard_grid = _channels[_SignalTypes.HAZARD]
 	var tile_store: Dictionary = reg.get_store(&"TileComponent")
+
+	# Rebuild climate hazard baseline only on long ticks (when climate changes) or first run
+	if not _climate_hazard_ready or (world != null and world.is_long_tick()):
+		_build_climate_hazard_cache(reg)
+
+	hazard_grid.data = _cached_climate_hazard.duplicate()
+
+	for idx: int in _climate_lethal_indices:
+		affordance_map[idx] |= _TileAffordance.HAZARD_LETHAL
 
 	# 1. Fire / Combustion
 	var burn_store: Dictionary = reg.get_store(&"BurningComponent")
@@ -320,54 +415,111 @@ func _sample_hazards(reg) -> void:
 			if tox_corr >= 0.5:
 				affordance_map[idx] |= _TileAffordance.HAZARD_LETHAL
 
-	# 4. Thermodynamic Extreme Temperatures (sampled on Rare Ticks or severe seasonal weather)
-	# Note: Local combustion fires are already sampled above in step 1 via burn_store.
-	# Scan tile entities only (loose items in containers do not define terrain hazard cells)
-	if world != null and (world.is_rare_tick() or absf(world.season_temp_mod) > 0.7):
-		var matter_store: Dictionary = reg.get_store(&"MatterComponent")
-		for eid: int in tile_store:
-			var matter = matter_store.get(eid, null)
-			if matter != null and (matter.temperature_c > 65.0 or matter.temperature_c < -25.0):
-				var tile = tile_store[eid]
-				var idx: int = tile.position.y * _width + tile.position.x
-				var temp_hazard: float = 0.0
-				if matter.temperature_c > 65.0:
-					temp_hazard = clampf((matter.temperature_c - 65.0) / 40.0, 0.2, 1.0)
-				else:
-					temp_hazard = clampf((-25.0 - matter.temperature_c) / 30.0, 0.2, 1.0)
-				hazard_grid.data[idx] = maxf(hazard_grid.data[idx], temp_hazard)
-				if temp_hazard >= 0.7:
-					affordance_map[idx] |= _TileAffordance.HAZARD_LETHAL
+func _build_fluid_cache(reg) -> void:
+	if not _terrain_cache_ready:
+		_build_terrain_cache()
+	if not _veg_cache_ready:
+		_build_veg_cache(reg)
 
-func _sample_fluids(reg) -> void:
-	var hydra_grid = _channels[_SignalTypes.HYDRATION]
-	var trav_grid  = _channels[_SignalTypes.TRAVERSABILITY]
-	var fluid_store: Dictionary = reg.get_store(&"FluidComponent")
-	var tile_store:  Dictionary = reg.get_store(&"TileComponent")
+	if _cached_hydration.size() != _total_tiles:
+		_cached_hydration.resize(_total_tiles)
+	_cached_hydration.fill(0.0)
+
+	_combined_affordance_map = _veg_affordance_cache.duplicate()
+	_base_trav_cache = _clean_trav_cache.duplicate()
+
+	var fluid_store: Dictionary  = reg.get_store(&"FluidComponent")
+	var tile_store: Dictionary   = reg.get_store(&"TileComponent")
+	var contam_store: Dictionary = reg.get_store(&"ContaminantComponent")
+	var has_contam: bool         = not contam_store.is_empty()
 
 	for eid: int in fluid_store:
 		var fluid = fluid_store[eid]
+		if fluid == null or not fluid.settled or fluid.material_id != _MaterialTypes.Type.WATER:
+			continue
+		var tile = tile_store.get(eid, null)
+		if tile == null:
+			continue
+		var idx: int = tile.position.y * _width + tile.position.x
+		if idx < 0 or idx >= _total_tiles:
+			continue
+
+		var is_contaminated: bool = false
+		if has_contam:
+			var contam = contam_store.get(eid, null)
+			is_contaminated = contam != null and (contam.toxicity > 0.2 or contam.corrosion > 0.2)
+
+		if not is_contaminated:
+			_cached_hydration[idx] = clampf(fluid.volume, 0.0, 1.0)
+			_combined_affordance_map[idx] |= _TileAffordance.DRINKABLE
+
+		# Depth / swimming check on base affordance & traversability
+		if fluid.volume >= 0.4:
+			_combined_affordance_map[idx] |= _TileAffordance.SWIMMABLE
+			_combined_affordance_map[idx] &= ~_TileAffordance.WALKABLE
+			_base_trav_cache[idx] = minf(_base_trav_cache[idx], 0.4)
+		elif fluid.volume >= 0.15:
+			_combined_affordance_map[idx] |= (_TileAffordance.WALKABLE | _TileAffordance.HAZARD_SLOW)
+			_combined_affordance_map[idx] &= ~_TileAffordance.SWIMMABLE
+			_base_trav_cache[idx] = minf(_base_trav_cache[idx], 0.7)
+		else:
+			_combined_affordance_map[idx] |= _TileAffordance.WALKABLE
+			_combined_affordance_map[idx] &= ~_TileAffordance.SWIMMABLE
+
+	_cached_fluid_count = fluid_store.size()
+	_fluid_cache_ready = true
+
+func _sample_fluids(reg) -> void:
+	var fluid_store: Dictionary = reg.get_store(&"FluidComponent")
+	if not _fluid_cache_ready or fluid_store.size() != _cached_fluid_count or (world != null and world.is_rare_tick()):
+		_build_fluid_cache(reg)
+		affordance_map = _combined_affordance_map.duplicate()
+
+	var hydra_grid = _channels[_SignalTypes.HYDRATION]
+	hydra_grid.data = _cached_hydration.duplicate()
+
+	var tile_store: Dictionary   = reg.get_store(&"TileComponent")
+	var contam_store: Dictionary = reg.get_store(&"ContaminantComponent")
+	var has_contam: bool         = not contam_store.is_empty()
+	var trav_grid                = _channels[_SignalTypes.TRAVERSABILITY]
+
+	# Fast scan: only iterate unsettled (dynamic) fluids, hazardous fluids, or if contaminants are present
+	for eid: int in fluid_store:
+		var fluid = fluid_store[eid]
+		if fluid == null:
+			continue
+		if fluid.settled and fluid.material_id == _MaterialTypes.Type.WATER and not has_contam:
+			continue
+
 		var tile = tile_store.get(eid, null)
 		if tile == null:
 			continue
 		var idx: int = tile.position.y * _width + tile.position.x
 
-		# Check water vs hazardous fluid
 		if fluid.material_id == _MaterialTypes.Type.WATER:
-			# Check contaminants
-			var contam = reg.get_component(eid, &"ContaminantComponent")
-			var is_contaminated: bool = contam != null and (contam.toxicity > 0.2 or contam.corrosion > 0.2)
+			var is_contaminated: bool = false
+			if has_contam:
+				var contam = contam_store.get(eid, null)
+				is_contaminated = contam != null and (contam.toxicity > 0.2 or contam.corrosion > 0.2)
+
 			if not is_contaminated:
 				hydra_grid.data[idx] = clampf(fluid.volume, 0.0, 1.0)
 				affordance_map[idx] |= _TileAffordance.DRINKABLE
+			else:
+				hydra_grid.data[idx] = 0.0
+				affordance_map[idx] &= ~_TileAffordance.DRINKABLE
 
-			# Depth / swimming check
 			if fluid.volume >= 0.4:
 				affordance_map[idx] |= _TileAffordance.SWIMMABLE
+				affordance_map[idx] &= ~_TileAffordance.WALKABLE
 				trav_grid.data[idx] = minf(trav_grid.data[idx], 0.4)
 			elif fluid.volume >= 0.15:
-				affordance_map[idx] |= _TileAffordance.HAZARD_SLOW
+				affordance_map[idx] |= (_TileAffordance.WALKABLE | _TileAffordance.HAZARD_SLOW)
+				affordance_map[idx] &= ~_TileAffordance.SWIMMABLE
 				trav_grid.data[idx] = minf(trav_grid.data[idx], 0.7)
+			else:
+				affordance_map[idx] |= _TileAffordance.WALKABLE
+				affordance_map[idx] &= ~_TileAffordance.SWIMMABLE
 		elif fluid.material_id == _MaterialTypes.Type.GREEK_FIRE:
 			_channels[_SignalTypes.HAZARD].data[idx] = 1.0
 			affordance_map[idx] |= _TileAffordance.HAZARD_LETHAL
@@ -416,28 +568,34 @@ func _build_veg_cache(reg) -> void:
 				_cached_cover[idx] = 0.4
 				_combined_affordance_map[idx] |= _TileAffordance.COVER
 
+	# Write directly to persistent channel data buffers without per-tick allocations
+	if _channels.has(_SignalTypes.FOOD_PLANT):
+		_channels[_SignalTypes.FOOD_PLANT].data = _cached_food_plant.duplicate()
+	if _channels.has(_SignalTypes.COVER):
+		_channels[_SignalTypes.COVER].data = _cached_cover.duplicate()
+
+	_veg_affordance_cache = _combined_affordance_map.duplicate()
 	_veg_cache_ready = true
+	_fluid_cache_ready = false # ensure fluid layer builds on top of updated vegetation affordances
 
 func _sample_vegetation(reg) -> void:
 	if not _veg_cache_ready or (world != null and world.is_rare_tick()):
 		_build_veg_cache(reg)
 
-	var plant_food_grid = _channels[_SignalTypes.FOOD_PLANT]
-	var cover_grid      = _channels[_SignalTypes.COVER]
-	plant_food_grid.data = _cached_food_plant.duplicate()
-	cover_grid.data = _cached_cover.duplicate()
-
 func _sample_inventory_items(reg) -> void:
-	var inv_store: Dictionary = reg.get_store(&"InventoryComponent")
-	if inv_store.is_empty():
+	if _active_inventories.is_empty():
 		return
 
 	var meat_food_grid = _channels[_SignalTypes.FOOD_MEAT]
 	var tile_store: Dictionary = reg.get_store(&"TileComponent")
+	var inv_store:  Dictionary = reg.get_store(&"InventoryComponent")
 
-	for container_id: int in inv_store:
-		var inv = inv_store[container_id]
-		if inv.items.is_empty():
+	var dead_containers: Array[int] = []
+
+	for container_id: int in _active_inventories:
+		var inv = inv_store.get(container_id, null)
+		if inv == null or inv.items.is_empty():
+			dead_containers.append(container_id)
 			continue
 
 		# Lazy cache initialization if directly populated
@@ -459,6 +617,9 @@ func _sample_inventory_items(reg) -> void:
 		# Meat emits blood scent downwind
 		if inv.has_blood_scent:
 			emit_scent(_SignalTypes.SCENT_BLOOD, tile.position, 0.6, 1)
+
+	for dead_id: int in dead_containers:
+		_active_inventories.erase(dead_id)
 
 func _process_signal_emitters(reg) -> void:
 	var emitter_store: Dictionary = reg.get_store(&"SignalEmitterComponent")

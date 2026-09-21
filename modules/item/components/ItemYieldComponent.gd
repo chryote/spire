@@ -22,5 +22,6 @@ var ticks_per_yield: int = 60
 var ticks_since_yield: int = 0
 
 ## Maximum items of this archetype this plant can have on the tile at once.
-## Production pauses when the cap is reached.  -1 = unlimited.
+## Production pauses when the cap is reached. -1 = unlimited.
+## Fallback when the item type is not defined in VegetationYieldSystem.MAX_YIELD_PER_TILE.
 var max_yield: int = 5

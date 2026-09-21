@@ -3,7 +3,7 @@
 [ext_resource type="Script" uid="uid://cddrtclr5kmy7" path="res://scenes/WorldView.gd" id="1_worldview"]
 [ext_resource type="Script" uid="uid://cxyewaot612dk" path="res://modules/rendering/systems/AsciiRenderSystem.gd" id="2_ascii"]
 [ext_resource type="Script" uid="uid://fhfullp08rhe" path="res://scenes/WorldCamera.gd" id="3_camera"]
-[ext_resource type="PackedScene" path="res://ui/HUD.tscn" id="4_hud"]
+[ext_resource type="PackedScene" uid="uid://bxqtfw00th4tb" path="res://ui/HUD.tscn" id="4_hud"]
 
 [node name="WorldView" type="Node2D"]
 script = ExtResource("1_worldview")
