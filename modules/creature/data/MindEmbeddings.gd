@@ -100,9 +100,11 @@ static func evaluate_utility(
 		Action.GRAZE:
 			var food_avail: float = perception.get(&"food_plant", 0.0) as float
 			var hunger: float     = drives[Drive.HUNGER]
+			var thirst: float     = drives[Drive.THIRST] if drives.size() > Drive.THIRST else 0.0
 			var hunger_curve: float = pow(hunger, 1.3)
-			# Hunger strongly drives seeking food; immediate presence is a bonus
-			return clampf(hunger_curve * (0.75 + food_avail * 0.45), 0.0, 1.0)
+			# Hunger strongly drives seeking food; thirst also provides secondary motivation
+			var drive_factor: float = hunger_curve + pow(thirst, 1.5) * 0.20
+			return clampf(drive_factor * (0.75 + food_avail * 0.45), 0.0, 1.0)
 
 		Action.DRINK:
 			var water_avail: float = perception.get(&"hydration", 0.0) as float

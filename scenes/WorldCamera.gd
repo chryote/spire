@@ -14,12 +14,19 @@ const ZOOM_STEP:   float = 0.25
 const KEY_PAN_SPEED: float = 650.0  # pixels per second at zoom 1.0
 const SMOOTH_FACTOR: float = 24.0   # lerp response rate
 
+@export var pause_simulation_on_move: bool = true
+@export var auto_resume_on_stop: bool = true
+
 var _dragging: bool   = false
 var _drag_start: Vector2 = Vector2.ZERO
 var _cam_start:  Vector2 = Vector2.ZERO
 
 var _target_position: Vector2 = Vector2.ZERO
 var _target_zoom:     Vector2 = Vector2(1.5, 1.5)
+
+var is_moving: bool = false
+var _paused_by_camera: bool = false
+var _was_paused_before_camera_move: bool = false
 
 func _ready() -> void:
 	# Start centred on the map (128 × 128 tiles at 18×18 px each)
@@ -29,6 +36,16 @@ func _ready() -> void:
 	zoom     = Vector2(1.5, 1.5)
 	_target_position = position
 	_target_zoom     = zoom
+
+func snap_to(target_world_pos: Vector2) -> void:
+	position = target_world_pos
+	_target_position = target_world_pos
+	# Snapping immediately places viewpoint at destination
+	if _paused_by_camera and auto_resume_on_stop and not _was_paused_before_camera_move:
+		if World != null:
+			World.paused = false
+		_paused_by_camera = false
+	is_moving = false
 
 func _input(event: InputEvent) -> void:
 	# --- Zoom via scroll wheel ---
@@ -71,6 +88,29 @@ func _process(delta: float) -> void:
 	var t: float = 1.0 - exp(-SMOOTH_FACTOR * delta)
 	position = position.lerp(_target_position, t)
 	zoom     = zoom.lerp(_target_zoom, t)
+
+	# Snap position to target when very close to eliminate asymptotic floating-point tail
+	if position.distance_squared_to(_target_position) < 0.5:
+		position = _target_position
+
+	# Detect whether camera is actively moving or interpolating towards target
+	var is_currently_moving: bool = _dragging or dir != Vector2.ZERO or (position.distance_squared_to(_target_position) >= 0.5)
+
+	if is_currently_moving and not is_moving:
+		# Movement started
+		is_moving = true
+		if pause_simulation_on_move and World != null:
+			_was_paused_before_camera_move = World.paused
+			if not World.paused:
+				World.paused = true
+				_paused_by_camera = true
+	elif not is_currently_moving and is_moving:
+		# Movement stopped
+		is_moving = false
+		if _paused_by_camera:
+			if auto_resume_on_stop and not _was_paused_before_camera_move and World != null:
+				World.paused = false
+			_paused_by_camera = false
 
 func _adjust_zoom(delta: float) -> void:
 	var nz: float = clampf(_target_zoom.x + delta, ZOOM_MIN, ZOOM_MAX)

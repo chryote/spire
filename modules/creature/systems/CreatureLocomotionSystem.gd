@@ -21,6 +21,7 @@ const _ItemFactory         = preload("res://modules/item/systems/ItemFactory.gd"
 const _ItemTypes           = preload("res://modules/item/data/ItemTypes.gd")
 const _TileAffordance      = preload("res://modules/signal/data/TileAffordance.gd")
 const _FluidComponent     = preload("res://modules/matter/components/FluidComponent.gd")
+const _MaterialTypes      = preload("res://modules/matter/data/MaterialTypes.gd")
 
 func initialize() -> void:
 	print("[CreatureLocomotionSystem] Initialized. Priority 235.")
@@ -92,6 +93,10 @@ func tick(tick_number: int) -> void:
 			# Check if creature is at target or current tile / adjacent tile has water
 			if pos_comp.position == plan.target_tile or plan.path_queue.is_empty():
 				_execute_drink(eid, pos_comp.position, pos_comp, creature, mind, mem, plan, tick_number)
+		elif plan.current_goal == _MindEmbeddings.Action.REST:
+			# Check if creature is at target or resting in place
+			if pos_comp.position == plan.target_tile or plan.path_queue.is_empty():
+				_execute_rest(eid, pos_comp.position, creature, mind, mem, plan, tick_number)
 
 	if any_moved:
 		world.mark_render_dirty()
@@ -113,6 +118,8 @@ func _execute_graze(
 	var reg = world.get_registry()
 	var veg: _VegetationComponent = reg.get_component(tile_eid, &"VegetationComponent")
 	var grazed: bool = false
+	var water_hydrated: bool = false
+	var thirst_quenched: float = 0.0
 
 	# 1. Prefer consuming loose grass items from tile inventory first (clearing yielded ground items)
 	var inv: _InventoryComponent = reg.get_component(tile_eid, &"InventoryComponent")
@@ -120,6 +127,16 @@ func _execute_graze(
 		for item_eid: int in inv.items:
 			var item: _ItemComponent = reg.get_component(item_eid, &"ItemComponent")
 			if item != null and item.item_type == _ItemTypes.Type.GRASS:
+				# Check if this grass item holds water material
+				if item.get_part_material("water") == _MaterialTypes.Type.WATER:
+					water_hydrated = true
+					thirst_quenched = 0.20
+				else:
+					var item_matter = reg.get_component(item_eid, &"MatterComponent")
+					if item_matter != null and item_matter.moisture >= 0.7:
+						water_hydrated = true
+						thirst_quenched = 0.20
+
 				if item.quantity > 1:
 					item.quantity -= 1
 					_ItemFactory.notify_item_destroyed(item.item_type, 1)
@@ -133,12 +150,19 @@ func _execute_graze(
 	if not grazed and veg != null and veg.growth_stage >= 1:
 		veg.growth_stage = maxi(0, veg.growth_stage - 1)
 		grazed = true
+		# Living plant tissue also provides modest hydration
+		var tile_matter = reg.get_component(tile_eid, &"MatterComponent")
+		if tile_matter != null and tile_matter.moisture >= 0.2:
+			water_hydrated = true
+			thirst_quenched = 0.10
 
 	if grazed:
 		# Replenish stomach and reduce hunger
 		creature.stomach_fill = minf(creature.stomach_capacity, creature.stomach_fill + 15.0)
 		if mind != null:
 			mind.hunger = maxf(0.0, mind.hunger - 0.35)
+			if water_hydrated and thirst_quenched > 0.0:
+				mind.thirst = maxf(0.0, mind.thirst - thirst_quenched)
 
 		# Emit soft munching sound
 		if world.signals != null:
@@ -150,7 +174,12 @@ func _execute_graze(
 
 		plan.clear_path()
 		world.mark_render_dirty()
-		print("[Creature] Grazer ate grass at %s. Hunger now %.2f." % [pos, mind.hunger if mind != null else 0.0])
+		if water_hydrated:
+			print("[Creature] Grazer ate fresh grass (with water) at %s. Hunger: %.2f, Thirst: %.2f." % [
+				pos, mind.hunger if mind != null else 0.0, mind.thirst if mind != null else 0.0
+			])
+		else:
+			print("[Creature] Grazer ate grass at %s. Hunger now %.2f." % [pos, mind.hunger if mind != null else 0.0])
 	else:
 		# Grass was already depleted
 		plan.clear_path()
@@ -222,4 +251,42 @@ func _execute_drink(
 	print("[Creature] %s drank water from %s. Thirst now %.2f." % [
 		creature.creature_name, water_pos, mind.thirst if mind != null else 0.0
 	])
+
+func _execute_rest(
+	_creature_eid: int,
+	pos: Vector2i,
+	creature: _CreatureComponent,
+	mind: _MindComponent,
+	mem: _MemoryComponent,
+	plan: _ActionPlanComponent,
+	tick_number: int
+) -> void:
+	plan.clear_path()
+	if mind == null:
+		return
+
+	var has_cover: bool = world.signals != null and world.signals.has_affordance(pos, _TileAffordance.COVER)
+
+	# Active resting recovery
+	var fatigue_rec: float = 0.04 if has_cover else 0.02
+	mind.fatigue = maxf(0.0, mind.fatigue - fatigue_rec)
+
+	if has_cover:
+		mind.fear = maxf(0.0, mind.fear - 0.03)
+		if mem != null:
+			mem.record_event(pos, &"rested", tick_number, 0.8)
+			mem.remember_landmark(pos, &"shelter", 1.0, tick_number)
+	else:
+		if mem != null:
+			mem.record_event(pos, &"rested", tick_number, 0.4)
+
+	world.mark_render_dirty()
+	if has_cover:
+		print("[Creature] %s resting safely under COVER at %s. Fatigue: %.2f." % [
+			creature.creature_name, pos, mind.fatigue
+		])
+	else:
+		print("[Creature] %s resting at %s. Fatigue: %.2f." % [
+			creature.creature_name, pos, mind.fatigue
+		])
 

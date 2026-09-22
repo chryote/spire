@@ -60,13 +60,20 @@ const DATA: Dictionary = {
 		"parts": {
 			"main": {
 				"role":           PartRole.PRIMARY_CONTACT,
-				"volume":         0.0001,  # 0.1 liters
+				"volume":         0.00006,  # 0.06 liters plant fiber
 				"valid_matters":  [20, 5],
 				"default_matter": 20,
 				"contact_area":   0.001,
 				"form":           _ImpactTypes.Form.BLUNT,
 				"sharpness":      0.5,
 				"thickness":      0.005,
+			},
+			"water": {
+				"role":           PartRole.CONTAINER,
+				"volume":         0.00004,  # 0.04 liters water / sap
+				"valid_matters":  [8],      # MaterialTypes.Type.WATER
+				"default_matter": 8,
+				"optional":       true,
 			}
 		}
 	},
@@ -513,6 +520,10 @@ static func build_composite_name(item_type: int, parts_materials: Dictionary) ->
 		elif p_data.get("toxicity", 0.0) >= 0.40 and part_name == "coating":
 			prefix = "Venomous "
 			break
+		# Hydrated plant with water material
+		elif item_type == Type.GRASS and part_name == "water" and p_mat == _MaterialTypes.Type.WATER:
+			prefix = "Fresh "
+			break
 
 	# Check secondary/handle parts
 	var other_descriptors: Array[String] = []
@@ -522,10 +533,15 @@ static func build_composite_name(item_type: int, parts_materials: Dictionary) ->
 		# If coating/payload produced an emergent prefix, do not clutter with parenthetical description
 		if prefix != "" and part_name in ["coating", "payload"]:
 			continue
+		if item_type == Type.GRASS and part_name == "water" and prefix == "Fresh ":
+			continue
 		var other_mat: int = parts_materials[part_name]
 		if other_mat != primary_mat:
 			var other_mat_name: String = _MaterialTypes.get_display_name(other_mat)
-			other_descriptors.append("%s %s" % [other_mat_name, part_name.capitalize()])
+			if other_mat_name.to_lower() == part_name.to_lower():
+				other_descriptors.append(other_mat_name)
+			else:
+				other_descriptors.append("%s %s" % [other_mat_name, part_name.capitalize()])
 
 	var full_base: String = primary_mat_name + " " + base
 	if prefix != "":

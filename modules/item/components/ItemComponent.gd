@@ -59,13 +59,20 @@ func can_stack_with(other_item_type: int, other_mat_id: int, other_parts: Dictio
 		if (parts[p_name].get("wear", 0.0) as float) > 0.001:
 			return false
 
-	# If other parts are specified, ensure materials match
+	# If other parts are specified, ensure materials and part sets match exactly
 	if not other_parts.is_empty():
+		if parts.size() != other_parts.size():
+			return false
 		for p_name in other_parts:
+			if not parts.has(p_name):
+				return false
 			var mat_val = other_parts[p_name]
 			var check_mat: int = mat_val["material_id"] if (mat_val is Dictionary and mat_val.has("material_id")) else (mat_val as int)
 			if get_part_material(p_name) != check_mat:
 				return false
+	elif parts.size() > 1:
+		# This composite item has multiple parts, cannot stack with plain unspecified single-material
+		return false
 
 	return true
 

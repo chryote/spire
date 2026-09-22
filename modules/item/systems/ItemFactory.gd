@@ -59,6 +59,8 @@ static func create(world: Node, item_type: int, material_type: int, quantity: in
 		var valid: Array = part_def.get("valid_matters", [])
 		if material_type in valid:
 			parts_map[part_name] = material_type
+		elif part_def.get("optional", false):
+			continue
 		else:
 			parts_map[part_name] = part_def.get("default_matter", material_type)
 
@@ -314,6 +316,29 @@ static func _finalize_deposit(
 
 	inv.container_id = target_entity
 	inv.items.append(item_id)
+
+## Convenience method to create grass, either fresh with water material or dried/pure.
+static func create_grass(world: Node, is_fresh: bool = true, quantity: int = 1) -> int:
+	if is_fresh:
+		return create_composite(world, _ItemTypes.Type.GRASS, {
+			"main":  _MaterialTypes.Type.ORGANIC,
+			"water": _MaterialTypes.Type.WATER,
+		}, quantity)
+	return create(world, _ItemTypes.Type.GRASS, _MaterialTypes.Type.ORGANIC, quantity)
+
+## Convenience method to create and deposit grass into an inventory.
+static func create_and_deposit_grass(
+	world: Node,
+	target_entity: int,
+	is_fresh: bool = true,
+	quantity: int = 1
+) -> int:
+	if is_fresh:
+		return create_composite_and_deposit(world, _ItemTypes.Type.GRASS, {
+			"main":  _MaterialTypes.Type.ORGANIC,
+			"water": _MaterialTypes.Type.WATER,
+		}, target_entity, quantity)
+	return create_and_deposit(world, _ItemTypes.Type.GRASS, _MaterialTypes.Type.ORGANIC, target_entity, quantity)
 
 
 

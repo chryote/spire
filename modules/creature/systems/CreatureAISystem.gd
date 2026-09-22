@@ -102,7 +102,10 @@ func tick(tick_number: int) -> void:
 			_MindEmbeddings.Action.WANDER:
 				_plan_wander(cur_pos, plan, pos_comp, mem, tick_number)
 
-			_MindEmbeddings.Action.REST, _MindEmbeddings.Action.IDLE:
+			_MindEmbeddings.Action.REST:
+				_plan_rest(cur_pos, plan, mem, tick_number)
+
+			_MindEmbeddings.Action.IDLE:
 				plan.clear_path()
 
 func _plan_drink(cur_pos: Vector2i, plan: _ActionPlanComponent, pos_comp: _PositionComponent, mem: _MemoryComponent, tick_number: int) -> void:
@@ -297,6 +300,64 @@ func _plan_wander(cur_pos: Vector2i, plan: _ActionPlanComponent, pos_comp: _Posi
 			plan.target_tile = next_pos
 			plan.path_queue = [next_pos]
 			return
+
+func _plan_rest(cur_pos: Vector2i, plan: _ActionPlanComponent, mem: _MemoryComponent, tick_number: int) -> void:
+	# 1. If current tile already provides COVER, stay and rest right here!
+	if world.signals.has_affordance(cur_pos, _TileAffordance.COVER) and not world.signals.has_affordance(cur_pos, _TileAffordance.HAZARD_LETHAL):
+		plan.clear_path()
+		plan.target_tile = cur_pos
+		return
+
+	# 2. If already en-route to a valid COVER target, keep following path
+	if not plan.path_queue.is_empty() and plan.target_tile != Vector2i(-1, -1):
+		if world.signals.has_affordance(plan.target_tile, _TileAffordance.COVER) and not world.signals.has_affordance(plan.target_tile, _TileAffordance.HAZARD_LETHAL):
+			return
+
+	# 3. Search local area (radius 16) for the best walkable tile with priority affordance of COVER
+	var best_cover_tile := Vector2i(-1, -1)
+	var best_score: float = -999.0
+
+	for dy in range(-16, 17):
+		for dx in range(-16, 17):
+			var candidate := Vector2i(cur_pos.x + dx, cur_pos.y + dy)
+			if not world.is_valid_position(candidate):
+				continue
+			if not world.signals.has_affordance(candidate, _TileAffordance.WALKABLE):
+				continue
+			if not world.signals.has_affordance(candidate, _TileAffordance.COVER):
+				continue
+			if world.signals.has_affordance(candidate, _TileAffordance.HAZARD_LETHAL):
+				continue
+
+			var dist: float = cur_pos.distance_to(candidate)
+			var cover_val: float = world.signals.get_signal(_SignalTypes.COVER, candidate)
+			var hazard_val: float = world.signals.get_signal(_SignalTypes.HAZARD, candidate)
+
+			# Prioritize higher cover quality, closer distance, lower hazard
+			var score: float = (cover_val * 3.0) - (dist * 0.20) - (hazard_val * 5.0)
+			if score > best_score:
+				best_score = score
+				best_cover_tile = candidate
+
+	# 4. Check long-term memory for remembered shelter / cover landmark if none visible nearby
+	if best_cover_tile == Vector2i(-1, -1) and mem != null:
+		var remembered_pos := mem.get_closest_landmark(&"shelter", cur_pos)
+		if remembered_pos != Vector2i(-1, -1) and world.is_valid_position(remembered_pos):
+			if world.signals.has_affordance(remembered_pos, _TileAffordance.COVER) and world.signals.has_affordance(remembered_pos, _TileAffordance.WALKABLE):
+				best_cover_tile = remembered_pos
+
+	if best_cover_tile != Vector2i(-1, -1):
+		var path = _build_simple_path(cur_pos, best_cover_tile)
+		if not path.is_empty():
+			plan.target_tile = best_cover_tile
+			plan.path_queue = path
+			if mem != null:
+				mem.remember_landmark(best_cover_tile, &"shelter", 1.0, tick_number)
+			return
+
+	# 5. Fallback: No COVER tile found or reachable - rest wherever it currently is!
+	plan.clear_path()
+	plan.target_tile = cur_pos
 
 ## Simple greedy Bresenham/step line towards target tile.
 func _build_simple_path(from_pos: Vector2i, to_pos: Vector2i) -> Array[Vector2i]:

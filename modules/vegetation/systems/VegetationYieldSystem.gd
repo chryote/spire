@@ -109,12 +109,17 @@ func tick(tick_number: int) -> void:
 				continue
 
 		# Deposit one item (ItemFactory handles stacking and O(1) global count updates)
-		_ItemFactory.create_and_deposit(
-			world,
-			yield_comp.item_type,
-			yield_comp.material_type,
-			entity_id
-		)
+		if yield_comp.item_type == _ItemTypes.Type.GRASS:
+			var matter = reg.get_component(entity_id, &"MatterComponent")
+			var is_fresh: bool = (matter == null or matter.moisture >= 0.2)
+			_ItemFactory.create_and_deposit_grass(world, entity_id, is_fresh, 1)
+		else:
+			_ItemFactory.create_and_deposit(
+				world,
+				yield_comp.item_type,
+				yield_comp.material_type,
+				entity_id
+			)
 
 
 # ---------------------------------------------------------------------------

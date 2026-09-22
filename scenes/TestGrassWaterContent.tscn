@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://testgrasswatercontent"]
+
+[ext_resource type="Script" path="res://tests/TestGrassWaterContent.gd" id="1_test_script"]
+
+[node name="TestGrassWaterContent" type="Node2D"]
+script = ExtResource("1_test_script")

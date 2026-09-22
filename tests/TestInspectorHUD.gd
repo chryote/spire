@@ -10,8 +10,10 @@ const _CreatureTypes     = preload("res://modules/creature/data/CreatureTypes.gd
 const _MaterialTypes     = preload("res://modules/matter/data/MaterialTypes.gd")
 const _BurningComponent  = preload("res://modules/matter/components/BurningComponent.gd")
 const _FluidComponent    = preload("res://modules/matter/components/FluidComponent.gd")
+const _WorldCameraScript  = preload("res://scenes/WorldCamera.gd")
 
 var _inspector = null
+var _camera = null
 
 func _ready() -> void:
 	print("\n=== STARTING INSPECTOR HUD AUTOMATED TEST ===")
@@ -24,6 +26,11 @@ func _ready() -> void:
 	add_child(_inspector)
 	await get_tree().process_frame
 
+	_camera = Camera2D.new()
+	_camera.set_script(_WorldCameraScript)
+	_camera.name = "WorldCamera"
+	add_child(_camera)
+
 	_test_inspector_initialization()
 	_test_toggle_shortcut_from_cold_start()
 	_test_inspect_environment_tile()
@@ -31,6 +38,7 @@ func _ready() -> void:
 	_test_inspect_creature()
 	_test_toggle_and_deselect()
 	await _test_live_tick_updates()
+	_test_camera_pause_and_creature_snap()
 
 	print("\n>>> ALL INSPECTOR HUD TESTS PASSED SUCCESSFULLY! <<<\n")
 	_save_test_log()
@@ -198,6 +206,74 @@ func _test_live_tick_updates() -> void:
 
 	assert(_inspector.main_panel.visible, "Inspector remains active during live simulation")
 	print("  -> PASSED: Inspector updates live across simulation ticks without errors.")
+
+func _test_camera_pause_and_creature_snap() -> void:
+	print("[Test 8] Camera Movement Auto-Pause and Creature Snapping...")
+	assert(_camera != null, "WorldCamera must exist in test tree")
+	assert(_camera.has_method("snap_to"), "WorldCamera must have snap_to method")
+
+	# 1. Test Camera snap_to
+	var test_snap_pos := Vector2(720.0, 540.0)
+	_camera.snap_to(test_snap_pos)
+	assert(_camera.position == test_snap_pos, "snap_to should immediately set camera position")
+	assert(_camera._target_position == test_snap_pos, "snap_to should immediately set _target_position")
+	assert(not _camera.is_moving, "snap_to should not leave camera in moving state")
+
+	# 2. Test Camera Movement Auto-Pause when simulation is running
+	World.paused = false
+	assert(not World.paused, "Simulation should be unpaused")
+
+	# Start moving camera by shifting target position
+	_camera._target_position = test_snap_pos + Vector2(200.0, 0.0)
+	_camera._process(0.016)
+	assert(_camera.is_moving, "Camera should detect active movement/interpolation")
+	assert(World.paused, "Simulation MUST automatically pause while camera is moving")
+
+	# Complete camera movement by processing sufficient time for exponential lerp to settle
+	for i in range(30):
+		_camera._process(0.05)
+	assert(not _camera.is_moving, "Camera should settle and stop moving")
+	assert(not World.paused, "Simulation MUST automatically resume after camera stops moving")
+
+	# 3. Test that manual pause is preserved across camera movement
+	World.paused = true
+	_camera._target_position = test_snap_pos + Vector2(400.0, 0.0)
+	_camera._process(0.016)
+	assert(_camera.is_moving, "Camera is moving")
+	assert(World.paused, "Simulation remains paused")
+
+	# Settle camera
+	for i in range(30):
+		_camera._process(0.05)
+	assert(not _camera.is_moving, "Camera settled")
+	assert(World.paused, "Simulation MUST remain paused if it was already paused before camera moved")
+
+	# 4. Test Inspector HUD find_and_select_nearest_creature snaps camera
+	var creature_tile := Vector2i(42, 42)
+	var ceid := _CreatureFactory.create(World, _CreatureTypes.Type.GRAZER, creature_tile, "Tracker")
+	assert(ceid != -1, "Creature creation succeeded")
+
+	# Deselect any prior tile and position camera near (42, 42)
+	_inspector.deselect()
+	var offset_cam_pos := Vector2(45.0 * 18.0, 45.0 * 18.0)
+	_camera.snap_to(offset_cam_pos)
+	assert(_camera.position == offset_cam_pos, "Camera positioned near test creature")
+
+	# Click find creature
+	_inspector.find_and_select_nearest_creature()
+
+	var expected_world_pos := Vector2(creature_tile.x * 18.0 + 9.0, creature_tile.y * 18.0 + 9.0)
+	assert(_inspector.selected_tile == creature_tile, "Inspector should select nearest creature tile")
+	assert(_inspector.tab_container.current_tab == 1, "Should switch to Creature tab")
+	assert(_camera.position == expected_world_pos, "Camera MUST snap directly to creature world coordinates")
+
+	# 5. Test SnapCreatureBtn in CreatureSection
+	_camera.snap_to(Vector2(50.0, 50.0))
+	assert(_camera.position == Vector2(50.0, 50.0), "Camera moved away")
+	_inspector._on_snap_creature_pressed()
+	assert(_camera.position == expected_world_pos, "Snap button in CreatureSection MUST re-snap camera to creature")
+
+	print("  -> PASSED: Camera movement auto-pauses simulation and Inspector HUD snaps camera to creatures.")
 
 func _save_test_log() -> void:
 	var file = FileAccess.open("res://logs/test_inspector_hud.log", FileAccess.WRITE)

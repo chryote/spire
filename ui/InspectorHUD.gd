@@ -52,6 +52,7 @@ signal tile_deselected()
 @onready var creature_section: Control = $MainPanel/Margin/VBox/TabContainer/Creature/Margin/VBox/CreatureSection
 @onready var no_creature_vbox: Control = $MainPanel/Margin/VBox/TabContainer/Creature/Margin/VBox/NoCreatureVBox
 @onready var find_creature_btn: Button = $MainPanel/Margin/VBox/TabContainer/Creature/Margin/VBox/NoCreatureVBox/FindCreatureBtn
+@onready var snap_creature_btn: Button = get_node_or_null("MainPanel/Margin/VBox/TabContainer/Creature/Margin/VBox/CreatureSection/SnapCreatureBtn")
 
 @onready var creature_header_label: Label = $MainPanel/Margin/VBox/TabContainer/Creature/Margin/VBox/CreatureSection/CreatureHeaderLabel
 @onready var creature_thought_label: RichTextLabel = $MainPanel/Margin/VBox/TabContainer/Creature/Margin/VBox/CreatureSection/CreatureThoughtLabel
@@ -121,6 +122,8 @@ func _ready() -> void:
 		toggle_btn.pressed.connect(toggle_inspector)
 	if find_creature_btn != null:
 		find_creature_btn.pressed.connect(find_and_select_nearest_creature)
+	if snap_creature_btn != null:
+		snap_creature_btn.pressed.connect(_on_snap_creature_pressed)
 
 	_setup_selection_box()
 
@@ -212,20 +215,72 @@ func _update_toggle_btn() -> void:
 	if toggle_btn != null:
 		toggle_btn.text = "[I] CLOSE" if main_panel.visible else "[I] INSPECTOR"
 
+func _get_camera() -> Camera2D:
+	var cam: Camera2D = get_viewport().get_camera_2d()
+	if cam != null:
+		return cam
+	var world_scene = get_parent()
+	if world_scene != null:
+		return world_scene.get_node_or_null("WorldCamera") as Camera2D
+	return null
+
+func snap_camera_to_tile(tile_pos: Vector2i) -> void:
+	var cam := _get_camera()
+	if cam != null:
+		var world_pos := Vector2(tile_pos.x * 18.0 + 9.0, tile_pos.y * 18.0 + 9.0)
+		if cam.has_method("snap_to"):
+			cam.snap_to(world_pos)
+		else:
+			cam.position = world_pos
+			if "_target_position" in cam:
+				cam._target_position = world_pos
+
 func _find_any_creature_pos() -> Vector2i:
+	return _find_nearest_creature_pos(Vector2i(64, 64))
+
+func _find_nearest_creature_pos(ref_pos: Vector2i) -> Vector2i:
 	if World != null:
 		var reg = World.get_registry()
 		if reg != null:
 			var pos_store: Dictionary = reg.get_store(&"PositionComponent")
-			for ceid in pos_store:
-				return pos_store[ceid].position
+			if not pos_store.is_empty():
+				var best_pos := Vector2i(-1, -1)
+				var min_dist_sq: float = INF
+				for ceid: int in pos_store:
+					var cpos: Vector2i = pos_store[ceid].position
+					var d_sq: float = float((cpos.x - ref_pos.x) * (cpos.x - ref_pos.x) + (cpos.y - ref_pos.y) * (cpos.y - ref_pos.y))
+					if d_sq < min_dist_sq:
+						min_dist_sq = d_sq
+						best_pos = cpos
+				if best_pos != Vector2i(-1, -1):
+					return best_pos
 	return Vector2i(64, 80)
 
 func find_and_select_nearest_creature() -> void:
-	var target_pos := _find_any_creature_pos()
+	var cam := _get_camera()
+	var ref_pos := selected_tile
+	if ref_pos == Vector2i(-1, -1) and cam != null:
+		ref_pos = Vector2i(floori(cam.position.x / 18.0), floori(cam.position.y / 18.0))
+	elif ref_pos == Vector2i(-1, -1):
+		ref_pos = Vector2i(64, 64)
+
+	var target_pos := _find_nearest_creature_pos(ref_pos)
 	inspect_tile(target_pos)
 	if tab_container != null:
 		tab_container.current_tab = 1
+	snap_camera_to_tile(target_pos)
+
+func _on_snap_creature_pressed() -> void:
+	if selected_creature_eid != -1 and World != null:
+		var reg = World.get_registry()
+		if reg != null:
+			var pos_comp = reg.get_component(selected_creature_eid, &"PositionComponent")
+			if pos_comp != null:
+				snap_camera_to_tile(pos_comp.position)
+				inspect_tile(pos_comp.position, selected_creature_eid)
+				return
+	if selected_tile != Vector2i(-1, -1):
+		snap_camera_to_tile(selected_tile)
 
 # ---------------------------------------------------------------------------
 # Inspection & Selection API
@@ -517,7 +572,14 @@ func _render_creature(reg, ceid: int) -> void:
 				thought_text = "Fleeing in panic from dangerous hazards!"
 			_MindEmbeddings.Action.REST:
 				act_name = "REST"
-				thought_text = "Resting in place to recover depleted stamina."
+				if plan.target_tile != selected_tile and not plan.path_queue.is_empty():
+					thought_text = "Seeking cover at %s to rest safely (fatigue: %.0f%%)." % [
+						plan.target_tile, mind.fatigue * 100.0 if mind != null else 50.0
+					]
+				else:
+					thought_text = "Resting to recover depleted energy (fatigue: %.0f%%)." % [
+						mind.fatigue * 100.0 if mind != null else 50.0
+					]
 			_MindEmbeddings.Action.WANDER:
 				act_name = "WANDER"
 				thought_text = "Curiously exploring terrain (curiosity drive: %.0f%%)." % [
