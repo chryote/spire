@@ -1,0 +1,3 @@
+PASSED: Creature Navigation and Drinking verified.
+- Navigation to shore approach and drinking successful.
+- Immediate in-place drinking from adjacent water tile successful.

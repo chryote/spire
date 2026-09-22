@@ -34,6 +34,8 @@ enum Type {
 	PICKAXE   = 7,
 	TORCH     = 8,
 	DAGGER    = 9,
+	LIMB      = 10,
+	ORGAN     = 11,
 }
 
 ## Functional role of an item part within the mold.
@@ -370,6 +372,59 @@ const DATA: Dictionary = {
 				"volume":         0.00005,
 				"valid_matters":  [14, 16, 17, 18],
 				"optional":       true,
+			}
+		}
+	},
+	Type.LIMB: {
+		"base_name":     "Limb",
+		"valid_matters": [
+			12,  # MaterialTypes.Type.RAW_MEAT
+			21,  # MaterialTypes.Type.BONE
+			20,  # MaterialTypes.Type.ORGANIC
+		],
+		"stackable":  false,
+		"max_stack":  1,
+		"parts": {
+			"flesh": {
+				"role":           PartRole.PRIMARY_CONTACT,
+				"volume":         0.005,
+				"valid_matters":  [12, 20],
+				"default_matter": 12,
+				"contact_area":   0.02,
+				"form":           _ImpactTypes.Form.BLUNT,
+				"sharpness":      0.2,
+				"thickness":      0.05,
+			},
+			"bone": {
+				"role":           PartRole.HANDLE,
+				"volume":         0.002,
+				"valid_matters":  [21],
+				"default_matter": 21,
+				"contact_area":   0.01,
+				"form":           _ImpactTypes.Form.BLUNT,
+				"sharpness":      0.5,
+				"thickness":      0.03,
+			}
+		}
+	},
+	Type.ORGAN: {
+		"base_name":     "Organ",
+		"valid_matters": [
+			12,  # MaterialTypes.Type.RAW_MEAT
+			20,  # MaterialTypes.Type.ORGANIC
+		],
+		"stackable":  false,
+		"max_stack":  1,
+		"parts": {
+			"tissue": {
+				"role":           PartRole.PRIMARY_CONTACT,
+				"volume":         0.001,
+				"valid_matters":  [12, 20],
+				"default_matter": 12,
+				"contact_area":   0.01,
+				"form":           _ImpactTypes.Form.BLUNT,
+				"sharpness":      0.1,
+				"thickness":      0.03,
 			}
 		}
 	},

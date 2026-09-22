@@ -38,12 +38,18 @@ const _VegetationGrowthSystem= preload("res://modules/vegetation/systems/Vegetat
 const _VegetationYieldSystem = preload("res://modules/vegetation/systems/VegetationYieldSystem.gd")
 const _ImpactSolverSystem    = preload("res://modules/matter/systems/ImpactSolverSystem.gd")
 const _SignalSystem          = preload("res://modules/signal/systems/SignalSystem.gd")
+const _CreatureBodySystem       = preload("res://modules/creature/systems/CreatureBodySystem.gd")
+const _CreatureAISystem         = preload("res://modules/creature/systems/CreatureAISystem.gd")
+const _CreatureLocomotionSystem = preload("res://modules/creature/systems/CreatureLocomotionSystem.gd")
 
 # ---------------------------------------------------------------------------
 # Map constants
 # ---------------------------------------------------------------------------
 const MAP_WIDTH: int  = 128
 const MAP_HEIGHT: int = 128
+
+## Biome of the active local map tile (0 = BiomeTypes.Type.PLAINS).
+var local_biome: int = 0
 
 # ---------------------------------------------------------------------------
 # Time constants (Dwarf Fortress-exact)
@@ -56,10 +62,10 @@ const TICKS_PER_YEAR:   int = 403_200  ## 4 seasons
 # ---------------------------------------------------------------------------
 # Temperature scale — change these two values to rescale the whole simulation
 # ---------------------------------------------------------------------------
-## Celsius at BiomeComponent.temperature = 0.0  (deep winter / polar).
-const TEMP_MIN_C: float = -50.0
-## Celsius at BiomeComponent.temperature = 1.0  (extreme heat peak).
-const TEMP_MAX_C: float = 150.0
+## Celsius at BiomeComponent.temperature = 0.0  (deep winter / frost).
+const TEMP_MIN_C: float = -20.0
+## Celsius at BiomeComponent.temperature = 1.0  (extreme summer heat peak).
+const TEMP_MAX_C: float = 50.0
 
 # ---------------------------------------------------------------------------
 # Weather state (written by WeatherSystem each tick, read by AsciiRenderSystem)
@@ -306,6 +312,11 @@ func _register_modules() -> void:
 	signals = _SignalSystem.new()
 	_add_system(signals, 220)
 
+	# --- Creature module (priorities 225, 230, 235) ---
+	_add_system(_CreatureBodySystem.new(), 225)
+	_add_system(_CreatureAISystem.new(), 230)
+	_add_system(_CreatureLocomotionSystem.new(), 235)
+
 	# Sort ascending by priority so lower numbers execute first
 	_sim_systems.sort_custom(func(a, b) -> bool: return a.priority < b.priority)
 
@@ -361,6 +372,16 @@ func get_entity_at(pos: Vector2i) -> int:
 func is_valid_position(pos: Vector2i) -> bool:
 	return pos.x >= 0 and pos.x < MAP_WIDTH \
 		and pos.y >= 0 and pos.y < MAP_HEIGHT
+
+## Return the creature entity ID at a tile position, or -1 if none.
+func get_creature_at(pos: Vector2i) -> int:
+	if _registry == null:
+		return -1
+	var pos_store: Dictionary = _registry.get_store(&"PositionComponent")
+	for eid: int in pos_store:
+		if pos_store[eid].position == pos:
+			return eid
+	return -1
 
 # ===========================================================================
 # Component API (delegates to registry)

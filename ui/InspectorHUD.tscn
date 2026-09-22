@@ -1,0 +1,443 @@
+[gd_scene load_steps=10 format=3 uid="uid://inspector_hud_spire"]
+
+[ext_resource type="Script" path="res://ui/InspectorHUD.gd" id="1_inspector"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_panel"]
+content_margin_left = 12.0
+content_margin_top = 10.0
+content_margin_right = 12.0
+content_margin_bottom = 10.0
+bg_color = Color(0.04, 0.06, 0.1, 0.94)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.2, 0.35, 0.52, 0.9)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+shadow_color = Color(0, 0, 0, 0.45)
+shadow_size = 10
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_btn"]
+content_margin_left = 8.0
+content_margin_top = 2.0
+content_margin_right = 8.0
+content_margin_bottom = 2.0
+bg_color = Color(0.12, 0.18, 0.28, 0.9)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.3, 0.5, 0.75, 0.8)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_tab_selected"]
+content_margin_left = 14.0
+content_margin_top = 5.0
+content_margin_right = 14.0
+content_margin_bottom = 5.0
+bg_color = Color(0.1, 0.18, 0.3, 0.95)
+border_width_left = 1
+border_width_top = 2
+border_width_right = 1
+border_color = Color(0.35, 0.6, 0.9, 1)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_tab_unselected"]
+content_margin_left = 14.0
+content_margin_top = 5.0
+content_margin_right = 14.0
+content_margin_bottom = 5.0
+bg_color = Color(0.06, 0.09, 0.15, 0.8)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_color = Color(0.18, 0.28, 0.4, 0.7)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_tab_panel"]
+content_margin_left = 4.0
+content_margin_top = 8.0
+content_margin_right = 4.0
+content_margin_bottom = 4.0
+bg_color = Color(0.03, 0.05, 0.08, 0.5)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.18, 0.28, 0.42, 0.8)
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_bar_bg"]
+bg_color = Color(0.06, 0.09, 0.14, 0.9)
+corner_radius_top_left = 2
+corner_radius_top_right = 2
+corner_radius_bottom_right = 2
+corner_radius_bottom_left = 2
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_health_fill"]
+bg_color = Color(0.25, 0.8, 0.35, 0.9)
+corner_radius_top_left = 2
+corner_radius_top_right = 2
+corner_radius_bottom_right = 2
+corner_radius_bottom_left = 2
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_stamina_fill"]
+bg_color = Color(0.95, 0.75, 0.2, 0.9)
+corner_radius_top_left = 2
+corner_radius_top_right = 2
+corner_radius_bottom_right = 2
+corner_radius_bottom_left = 2
+
+[node name="InspectorHUD" type="CanvasLayer"]
+layer = 100
+script = ExtResource("1_inspector")
+
+[node name="ToggleBtn" type="Button" parent="."]
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -115.0
+offset_top = 10.0
+offset_right = -10.0
+offset_bottom = 34.0
+grow_horizontal = 0
+theme_override_font_sizes/font_size = 11
+theme_override_styles/normal = SubResource("StyleBoxFlat_btn")
+text = "[I] INSPECT"
+
+[node name="MainPanel" type="PanelContainer" parent="."]
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -430.0
+offset_top = 10.0
+offset_right = -10.0
+offset_bottom = 710.0
+grow_horizontal = 0
+theme_override_styles/panel = SubResource("StyleBoxFlat_panel")
+
+[node name="Margin" type="MarginContainer" parent="MainPanel"]
+layout_mode = 2
+
+[node name="VBox" type="VBoxContainer" parent="MainPanel/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="Header" type="HBoxContainer" parent="MainPanel/Margin/VBox"]
+layout_mode = 2
+
+[node name="TitleLabel" type="Label" parent="MainPanel/Margin/VBox/Header"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.85, 0.95, 1, 1)
+theme_override_font_sizes/font_size = 13
+text = "TILE & ENTITY INSPECTOR"
+
+[node name="CoordLabel" type="Label" parent="MainPanel/Margin/VBox/Header"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.3, 0.85, 1, 1)
+theme_override_font_sizes/font_size = 13
+text = "[--, --]"
+
+[node name="CloseBtn" type="Button" parent="MainPanel/Margin/VBox/Header"]
+custom_minimum_size = Vector2(24, 20)
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+theme_override_styles/normal = SubResource("StyleBoxFlat_btn")
+text = "✕"
+
+[node name="HeaderDivider" type="HSeparator" parent="MainPanel/Margin/VBox"]
+layout_mode = 2
+
+[node name="TabContainer" type="TabContainer" parent="MainPanel/Margin/VBox"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_font_sizes/font_size = 12
+theme_override_styles/tab_selected = SubResource("StyleBoxFlat_tab_selected")
+theme_override_styles/tab_unselected = SubResource("StyleBoxFlat_tab_unselected")
+theme_override_styles/panel = SubResource("StyleBoxFlat_tab_panel")
+current_tab = 0
+
+[node name="Environment" type="ScrollContainer" parent="MainPanel/Margin/VBox/TabContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+
+[node name="Margin" type="MarginContainer" parent="MainPanel/Margin/VBox/TabContainer/Environment"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/margin_left = 6
+theme_override_constants/margin_top = 6
+theme_override_constants/margin_right = 6
+theme_override_constants/margin_bottom = 6
+
+[node name="VBox" type="VBoxContainer" parent="MainPanel/Margin/VBox/TabContainer/Environment/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="EnvTitle" type="Label" parent="MainPanel/Margin/VBox/TabContainer/Environment/Margin/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.4, 0.8, 1, 1)
+theme_override_font_sizes/font_size = 12
+text = "TERRAIN & CLIMATE"
+
+[node name="EnvSection" type="VBoxContainer" parent="MainPanel/Margin/VBox/TabContainer/Environment/Margin/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="EnvSummaryLabel" type="RichTextLabel" parent="MainPanel/Margin/VBox/TabContainer/Environment/Margin/VBox/EnvSection"]
+layout_mode = 2
+theme_override_font_sizes/normal_font_size = 11
+theme_override_font_sizes/bold_font_size = 11
+bbcode_enabled = true
+text = "[color=#778899]Select a tile to inspect...[/color]"
+fit_content = true
+scroll_active = false
+
+[node name="ActivityTitle" type="Label" parent="MainPanel/Margin/VBox/TabContainer/Environment/Margin/VBox/EnvSection"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.7, 0.85, 0.95, 1)
+theme_override_font_sizes/font_size = 11
+text = "What is Happening on this Tile:"
+
+[node name="EnvActivityLabel" type="RichTextLabel" parent="MainPanel/Margin/VBox/TabContainer/Environment/Margin/VBox/EnvSection"]
+layout_mode = 2
+theme_override_font_sizes/normal_font_size = 11
+theme_override_font_sizes/bold_font_size = 11
+bbcode_enabled = true
+text = "[color=#778899]None[/color]"
+fit_content = true
+scroll_active = false
+
+[node name="VegTitle" type="Label" parent="MainPanel/Margin/VBox/TabContainer/Environment/Margin/VBox/EnvSection"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.5, 0.85, 0.5, 1)
+theme_override_font_sizes/font_size = 11
+text = "Vegetation / Flora:"
+
+[node name="EnvVegLabel" type="RichTextLabel" parent="MainPanel/Margin/VBox/TabContainer/Environment/Margin/VBox/EnvSection"]
+layout_mode = 2
+theme_override_font_sizes/normal_font_size = 11
+theme_override_font_sizes/bold_font_size = 11
+bbcode_enabled = true
+text = "[color=#778899]No vegetation[/color]"
+fit_content = true
+scroll_active = false
+
+[node name="ItemsTitle" type="Label" parent="MainPanel/Margin/VBox/TabContainer/Environment/Margin/VBox/EnvSection"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.85, 0.75, 0.5, 1)
+theme_override_font_sizes/font_size = 11
+text = "Items on Ground:"
+
+[node name="EnvItemsLabel" type="RichTextLabel" parent="MainPanel/Margin/VBox/TabContainer/Environment/Margin/VBox/EnvSection"]
+layout_mode = 2
+theme_override_font_sizes/normal_font_size = 11
+theme_override_font_sizes/bold_font_size = 11
+bbcode_enabled = true
+text = "[color=#778899]None[/color]"
+fit_content = true
+scroll_active = false
+
+[node name="AffordanceTitle" type="Label" parent="MainPanel/Margin/VBox/TabContainer/Environment/Margin/VBox/EnvSection"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.3, 0.85, 0.9, 1)
+theme_override_font_sizes/font_size = 11
+text = "Affordances & Signals:"
+
+[node name="EnvAffordanceLabel" type="RichTextLabel" parent="MainPanel/Margin/VBox/TabContainer/Environment/Margin/VBox/EnvSection"]
+layout_mode = 2
+theme_override_font_sizes/normal_font_size = 11
+theme_override_font_sizes/bold_font_size = 11
+bbcode_enabled = true
+text = "[color=#778899]Affordances: None[/color]"
+fit_content = true
+scroll_active = false
+
+[node name="Creature" type="ScrollContainer" parent="MainPanel/Margin/VBox/TabContainer"]
+visible = false
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+
+[node name="Margin" type="MarginContainer" parent="MainPanel/Margin/VBox/TabContainer/Creature"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/margin_left = 6
+theme_override_constants/margin_top = 6
+theme_override_constants/margin_right = 6
+theme_override_constants/margin_bottom = 6
+
+[node name="VBox" type="VBoxContainer" parent="MainPanel/Margin/VBox/TabContainer/Creature/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="NoCreatureVBox" type="VBoxContainer" parent="MainPanel/Margin/VBox/TabContainer/Creature/Margin/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="NoticeLabel" type="RichTextLabel" parent="MainPanel/Margin/VBox/TabContainer/Creature/Margin/VBox/NoCreatureVBox"]
+layout_mode = 2
+theme_override_font_sizes/normal_font_size = 11
+bbcode_enabled = true
+text = "\n[center][color=#8899aa]No creature present on this tile.\n\nClick on any creature on the world map to inspect its thought process, body condition, and mind drives.[/color][/center]\n"
+fit_content = true
+scroll_active = false
+
+[node name="FindCreatureBtn" type="Button" parent="MainPanel/Margin/VBox/TabContainer/Creature/Margin/VBox/NoCreatureVBox"]
+layout_mode = 2
+size_flags_horizontal = 4
+theme_override_font_sizes/font_size = 11
+theme_override_styles/normal = SubResource("StyleBoxFlat_btn")
+text = "🔎 FIND NEAREST CREATURE"
+
+[node name="CreatureSection" type="VBoxContainer" parent="MainPanel/Margin/VBox/TabContainer/Creature/Margin/VBox"]
+visible = false
+layout_mode = 2
+theme_override_constants/separation = 7
+
+[node name="CreatureHeaderLabel" type="Label" parent="MainPanel/Margin/VBox/TabContainer/Creature/Margin/VBox/CreatureSection"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.9, 0.95, 1, 1)
+theme_override_font_sizes/font_size = 12
+text = "Grazer \"Grazer\" - [ALIVE]"
+
+[node name="ThoughtTitle" type="Label" parent="MainPanel/Margin/VBox/TabContainer/Creature/Margin/VBox/CreatureSection"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.8, 0.35, 1)
+theme_override_font_sizes/font_size = 11
+text = "Thought & Cognition:"
+
+[node name="CreatureThoughtLabel" type="RichTextLabel" parent="MainPanel/Margin/VBox/TabContainer/Creature/Margin/VBox/CreatureSection"]
+layout_mode = 2
+theme_override_font_sizes/normal_font_size = 11
+theme_override_font_sizes/bold_font_size = 11
+bbcode_enabled = true
+text = "[b]Current Action:[/b] IDLE\n[b]Thought:[/b] \"Observing area.\""
+fit_content = true
+scroll_active = false
+
+[node name="CreatureUtilitiesLabel" type="RichTextLabel" parent="MainPanel/Margin/VBox/TabContainer/Creature/Margin/VBox/CreatureSection"]
+layout_mode = 2
+theme_override_font_sizes/normal_font_size = 10
+theme_override_font_sizes/bold_font_size = 10
+bbcode_enabled = true
+text = "[color=#99aacc]Decision Utilities: Idle: 0.08[/color]"
+fit_content = true
+scroll_active = false
+
+[node name="BodyTitle" type="Label" parent="MainPanel/Margin/VBox/TabContainer/Creature/Margin/VBox/CreatureSection"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.5, 0.9, 0.6, 1)
+theme_override_font_sizes/font_size = 11
+text = "Condition of Body:"
+
+[node name="BodyVBox" type="VBoxContainer" parent="MainPanel/Margin/VBox/TabContainer/Creature/Margin/VBox/CreatureSection"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="HealthRow" type="HBoxContainer" parent="MainPanel/Margin/VBox/TabContainer/Creature/Margin/VBox/CreatureSection/BodyVBox"]
+layout_mode = 2
+
+[node name="HealthLabel" type="Label" parent="MainPanel/Margin/VBox/TabContainer/Creature/Margin/VBox/CreatureSection/BodyVBox/HealthRow"]
+custom_minimum_size = Vector2(50, 0)
+layout_mode = 2
+theme_override_font_sizes/font_size = 10
+text = "Health"
+
+[node name="HealthBar" type="ProgressBar" parent="MainPanel/Margin/VBox/TabContainer/Creature/Margin/VBox/CreatureSection/BodyVBox/HealthRow"]
+custom_minimum_size = Vector2(0, 8)
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 4
+theme_override_styles/background = SubResource("StyleBoxFlat_bar_bg")
+theme_override_styles/fill = SubResource("StyleBoxFlat_health_fill")
+value = 100.0
+show_percentage = false
+
+[node name="HealthVal" type="Label" parent="MainPanel/Margin/VBox/TabContainer/Creature/Margin/VBox/CreatureSection/BodyVBox/HealthRow"]
+custom_minimum_size = Vector2(35, 0)
+layout_mode = 2
+theme_override_font_sizes/font_size = 10
+text = "100%"
+horizontal_alignment = 2
+
+[node name="StaminaRow" type="HBoxContainer" parent="MainPanel/Margin/VBox/TabContainer/Creature/Margin/VBox/CreatureSection/BodyVBox"]
+layout_mode = 2
+
+[node name="StaminaLabel" type="Label" parent="MainPanel/Margin/VBox/TabContainer/Creature/Margin/VBox/CreatureSection/BodyVBox/StaminaRow"]
+custom_minimum_size = Vector2(50, 0)
+layout_mode = 2
+theme_override_font_sizes/font_size = 10
+text = "Stamina"
+
+[node name="StaminaBar" type="ProgressBar" parent="MainPanel/Margin/VBox/TabContainer/Creature/Margin/VBox/CreatureSection/BodyVBox/StaminaRow"]
+custom_minimum_size = Vector2(0, 8)
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 4
+theme_override_styles/background = SubResource("StyleBoxFlat_bar_bg")
+theme_override_styles/fill = SubResource("StyleBoxFlat_stamina_fill")
+value = 100.0
+show_percentage = false
+
+[node name="StaminaVal" type="Label" parent="MainPanel/Margin/VBox/TabContainer/Creature/Margin/VBox/CreatureSection/BodyVBox/StaminaRow"]
+custom_minimum_size = Vector2(35, 0)
+layout_mode = 2
+theme_override_font_sizes/font_size = 10
+text = "100%"
+horizontal_alignment = 2
+
+[node name="BodyDetailsLabel" type="RichTextLabel" parent="MainPanel/Margin/VBox/TabContainer/Creature/Margin/VBox/CreatureSection/BodyVBox"]
+layout_mode = 2
+theme_override_font_sizes/normal_font_size = 10
+theme_override_font_sizes/bold_font_size = 10
+bbcode_enabled = true
+text = "Nutrition: 15.0 / 50.0 pts   Blood: 2.2 / 2.2 L"
+fit_content = true
+scroll_active = false
+
+[node name="AnatomyLabel" type="RichTextLabel" parent="MainPanel/Margin/VBox/TabContainer/Creature/Margin/VBox/CreatureSection/BodyVBox"]
+layout_mode = 2
+theme_override_font_sizes/normal_font_size = 10
+theme_override_font_sizes/bold_font_size = 10
+bbcode_enabled = true
+text = "Limbs: All intact   Vitals: All functional"
+fit_content = true
+scroll_active = false
+
+[node name="MindTitle" type="Label" parent="MainPanel/Margin/VBox/TabContainer/Creature/Margin/VBox/CreatureSection"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.7, 0.75, 1, 1)
+theme_override_font_sizes/font_size = 11
+text = "Condition of Mind & Drives:"
+
+[node name="MindVBox" type="VBoxContainer" parent="MainPanel/Margin/VBox/TabContainer/Creature/Margin/VBox/CreatureSection"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="MoodLabel" type="Label" parent="MainPanel/Margin/VBox/TabContainer/Creature/Margin/VBox/CreatureSection/MindVBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.6, 0.9, 0.6, 1)
+theme_override_font_sizes/font_size = 11
+text = "Mood: Calm & Content"
+
+[node name="DrivesLabel" type="RichTextLabel" parent="MainPanel/Margin/VBox/TabContainer/Creature/Margin/VBox/CreatureSection/MindVBox"]
+layout_mode = 2
+theme_override_font_sizes/normal_font_size = 10
+theme_override_font_sizes/bold_font_size = 10
+bbcode_enabled = true
+text = "Hunger: 20%  Thirst: 10%  Fear: 0%  Fatigue: 0%"
+fit_content = true
+scroll_active = false

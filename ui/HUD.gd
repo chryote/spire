@@ -111,7 +111,11 @@ func update_hud(delta: float = 0.1, force_veg: bool = false) -> void:
 
 	var state_str: String = "PAUSED" if World.paused else "RUNNING (%.0f TPS)" % World.ticks_per_second
 	if status_label != null:
-		status_label.text = "Tick: %d | %s" % [World.tick_count, state_str]
+		var s_names := ["Spring", "Summer", "Autumn", "Winter"]
+		var s_idx: int = clampi(World.season, 0, 3)
+		var day_num: int = (World.tick_count / World.TICKS_PER_DAY) + 1
+		var season_str: String = "%s, Day %d" % [s_names[s_idx], day_num]
+		status_label.text = "Tick: %d (%s) | %s" % [World.tick_count, season_str, state_str]
 
 	# --- 2. Simulation Tick Budget ---
 	var sys_perf: Dictionary = World.get_system_performance_data()

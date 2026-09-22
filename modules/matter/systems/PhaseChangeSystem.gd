@@ -137,7 +137,7 @@ func tick(tick_number: int) -> void:
 			matter.moisture = maxf(0.0, matter.moisture - dry_rate)
 
 		# --- 4. Freeze check (LIQUID → SOLID) ---
-		if matter.state == 1:
+		if matter.state == 1 and matter.melting_point_c < INF:
 			if matter.temperature_c < matter.melting_point_c:
 				# Thermal lag: high specific_heat = more ticks needed to freeze.
 				if matter._freeze_lag <= 0:
@@ -223,7 +223,7 @@ func _process_matter_entity(entity_id: int, matter, biome, reg, veg_store: Dicti
 		matter.moisture = maxf(0.0, matter.moisture - dry_rate)
 
 	# --- 4. Freeze check (LIQUID → SOLID) ---
-	if matter.state == 1:
+	if matter.state == 1 and matter.melting_point_c < INF:
 		if matter.temperature_c < matter.melting_point_c:
 			if matter._freeze_lag <= 0:
 				matter._freeze_lag = int(matter.specific_heat / 500.0)
@@ -251,7 +251,7 @@ func _process_matter_entity(entity_id: int, matter, biome, reg, veg_store: Dicti
 			_on_boiled(entity_id, matter, reg)
 
 	# --- 5. Melt check (SOLID -> LIQUID) ---
-	elif matter.state == 0:
+	elif matter.state == 0 and matter.melting_point_c < 200.0:
 		if matter.temperature_c > matter.melting_point_c:
 			if matter._melt_lag <= 0:
 				matter._melt_lag = int(matter.specific_heat / 500.0)

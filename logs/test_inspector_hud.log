@@ -1,0 +1,10 @@
+PASSED: Tabbed Inspector HUD fully verified.
+Environment summary: [b]Terrain:[/b] [color=#90ee90]Lush Grass[/color]   [b]Biome:[/b] [color=#87ceeb]Plains[/color]
+[b]Material:[/b] Grass Turf   [b]Temp:[/b] [color=#ffcc66]14.8 °C[/color]   [b]Moisture:[/b] [color=#66ccff]46%[/color]   [b]Season:[/b] [color=#ffb6c1]Spring (Day 1)[/color]
+Creature header:     Grazer "Bramble" (eid=16384) — [ALIVE] (Age: 3)
+Creature thought:    [b]Current Action:[/b] [color=#ffd700][b]WANDER[/b][/color]  •  Target: (34, 32) (1 steps remaining)
+[b]Thought:[/b] [i]"Curiously exploring terrain (curiosity drive: 50%)."[/i]
+Creature body:       [b]Nutrition:[/b] 19.7 / 50.0 pts (39%)   [b]Mobility:[/b] 100%   [b]Mass:[/b] 60.8 kg
+[b]Blood:[/b] 2.20 / 2.20 L   [b]Core Temp:[/b] 38.0 °C
+Creature drives:     [b]Hunger:[/b] [color=#ffaa33]19%[/color]   [b]Thirst:[/b] [color=#33ccff]11%[/color]   [b]Fear:[/b] [color=#ff5555]0%[/color]   [b]Fatigue:[/b] [color=#cc99ff]1%[/color]
+[b]Curiosity:[/b] [color=#ffee55]50%[/color]   [b]Pain:[/b] [color=#ff4444]0%[/color]   [b]Comfort:[/b] [color=#66ff99]80%[/color]   [b]Social:[/b] [color=#ff99cc]0%[/color]

@@ -1,0 +1,3 @@
+PASSED: Creature Body & Mind Utility AI successfully spawned, navigated, and grazed.
+Limbs: 6, Organs: 4, Blood: 2.20 L, Initial hunger: 0.85, Final hunger: 0.45
+Tile Inventory Grass: 1 -> 0 (consumed loose grass item directly from inventory).

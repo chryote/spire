@@ -4,6 +4,7 @@
 [ext_resource type="Script" uid="uid://cxyewaot612dk" path="res://modules/rendering/systems/AsciiRenderSystem.gd" id="2_ascii"]
 [ext_resource type="Script" uid="uid://fhfullp08rhe" path="res://scenes/WorldCamera.gd" id="3_camera"]
 [ext_resource type="PackedScene" uid="uid://bxqtfw00th4tb" path="res://ui/HUD.tscn" id="4_hud"]
+[ext_resource type="PackedScene" path="res://ui/InspectorHUD.tscn" id="5_inspector"]
 
 [node name="WorldView" type="Node2D"]
 script = ExtResource("1_worldview")
@@ -15,3 +16,5 @@ script = ExtResource("2_ascii")
 script = ExtResource("3_camera")
 
 [node name="HUD" parent="." instance=ExtResource("4_hud")]
+
+[node name="InspectorHUD" parent="." instance=ExtResource("5_inspector")]

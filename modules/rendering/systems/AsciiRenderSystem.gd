@@ -329,6 +329,27 @@ func _update_simulation_textures(tick_number: int = 0) -> void:
 				flags |= (ri_int << 2)
 			_data_bytes[byte_idx + 3] = flags
 
+		# 5. Overlay dynamic actors (creatures)
+		var creature_store: Dictionary = reg.get_store(&"CreatureComponent")
+		var pos_store: Dictionary      = reg.get_store(&"PositionComponent")
+		for ceid: int in creature_store:
+			var c = creature_store[ceid]
+			if not c.is_alive:
+				continue
+			var p = pos_store.get(ceid, null)
+			var r = render_store.get(ceid, null)
+			if p != null and r != null:
+				var cpos: Vector2i = p.position
+				if cpos.x >= 0 and cpos.x < w and cpos.y >= 0 and cpos.y < h:
+					var byte_idx: int = (cpos.y * w + cpos.x) * 4
+					_fg_bytes[byte_idx]     = r.fg_color.r8
+					_fg_bytes[byte_idx + 1] = r.fg_color.g8
+					_fg_bytes[byte_idx + 2] = r.fg_color.b8
+					_fg_bytes[byte_idx + 3] = r.fg_color.a8
+					_data_bytes[byte_idx]   = _glyph_to_code(r.glyph)
+					_data_bytes[byte_idx + 1] = 0
+					_data_bytes[byte_idx + 2] = 0
+
 		_bg_image.set_data(w, h, false, Image.FORMAT_RGBA8, _bg_bytes)
 		_fg_image.set_data(w, h, false, Image.FORMAT_RGBA8, _fg_bytes)
 		_data_image.set_data(w, h, false, Image.FORMAT_RGBA8, _data_bytes)

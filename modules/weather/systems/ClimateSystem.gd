@@ -53,7 +53,7 @@ var _base_temps: Dictionary = {}
 
 func initialize() -> void:
 	# TerrainGenSystem has already run (priority 0), so BiomeComponent.temperature
-	# holds the latitudinal base value.  Cache it now before we start overwriting.
+	# holds the local embark tile's base value.  Cache it now before we start overwriting.
 	var reg = world.get_registry()
 	var store: Dictionary = reg.get_store(&"BiomeComponent")
 	for entity_id: int in store:

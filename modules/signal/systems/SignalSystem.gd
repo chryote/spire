@@ -17,6 +17,7 @@ const _MaterialTypes         = preload("res://modules/matter/data/MaterialTypes.
 const _TileTypes             = preload("res://modules/terrain/data/TileTypes.gd")
 const _VegetationTypes       = preload("res://modules/vegetation/data/VegetationTypes.gd")
 const _InventoryComponent    = preload("res://modules/item/components/InventoryComponent.gd")
+const _ItemTypes             = preload("res://modules/item/data/ItemTypes.gd")
 
 ## Registry of all active channels: StringName -> SignalGrid
 var _channels: Dictionary = {}
@@ -613,6 +614,13 @@ func _sample_inventory_items(reg) -> void:
 		if inv.has_carnivore_food and inv.max_calories > 0:
 			meat_food_grid.data[idx] = clampf(float(inv.max_calories) / 1000.0, 0.1, 1.0)
 			affordance_map[idx] |= _TileAffordance.CARNIVORE_FOOD
+
+		# Loose grass items in tile inventory (yielded from plants or dropped)
+		var grass_qty: int = inv.get_total_quantity_of_type(reg, _ItemTypes.Type.GRASS)
+		if grass_qty > 0:
+			var food_plant_grid = _channels[_SignalTypes.FOOD_PLANT]
+			food_plant_grid.data[idx] = maxf(food_plant_grid.data[idx], clampf(float(grass_qty) / 3.0, 0.4, 1.0))
+			affordance_map[idx] |= _TileAffordance.GRAZEABLE
 
 		# Meat emits blood scent downwind
 		if inv.has_blood_scent:

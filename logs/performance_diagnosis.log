@@ -1,52 +1,55 @@
 ================================================================================
                  SPIRE ENGINE DETAILED PERFORMANCE DIAGNOSIS                    
 ================================================================================
-Timestamp:       2026-09-21T19:37:11
-Session Duration: 216.33 seconds | Total Frames: 26426 | Simulation Ticks: 2149
+Timestamp:       2026-09-22T07:21:14
+Session Duration: 350.44 seconds | Total Frames: 23773 | Simulation Ticks: 3493
 Engine Version:  4.4.1-stable (official) | OS: Windows
-Static Memory:   233.07 MB (Peak: 234.39 MB)
+Static Memory:   319.88 MB (Peak: 320.05 MB)
 --------------------------------------------------------------------------------
 
 --- [1] FRAME PACING & DISPLAY DIAGNOSIS ---
-Average FPS:      125.4 FPS (Mean Frame Time: 7.98 ms)
-1% Low FPS:        20.3 FPS (Worst 1% Frame Mean: 49.17 ms)
-P95 Frame Time:   26.54 ms
-P99 Frame Time:   44.44 ms
-Max Frame Spike:  69.13 ms
-Frames > 16.6ms:  2060 (7.8% of frames dipped below 60 FPS)
-Frames > 33.3ms:   629 (2.4% of frames dipped below 30 FPS)
-Frames > 50.0ms:    75 (Severe hitches / freezes)
+Average FPS:       66.9 FPS (Mean Frame Time: 14.96 ms)
+1% Low FPS:         9.3 FPS (Worst 1% Frame Mean: 107.96 ms)
+P95 Frame Time:   73.64 ms
+P99 Frame Time:   87.57 ms
+Max Frame Spike: 141.39 ms
+Frames > 16.6ms:  3550 (14.9% of frames dipped below 60 FPS)
+Frames > 33.3ms:  3432 (14.4% of frames dipped below 30 FPS)
+Frames > 50.0ms:  3270 (Severe hitches / freezes)
 
 --- [2] SIMULATION TICK HEALTH (10 TPS Target = 100.0 ms budget) ---
-Average Tick Duration: 17.272 ms (Budget Used: 17.3%)
-Maximum Tick Spike:    202.867 ms (Budget Used: 202.9%)
-Simulation Headroom:   82.728 ms (5.8x faster than real-time threshold)
+Average Tick Duration: 43.301 ms (Budget Used: 43.3%)
+Maximum Tick Spike:    266.238 ms (Budget Used: 266.2%)
+Simulation Headroom:   56.699 ms (2.3x faster than real-time threshold)
 
 --- [3] PER-SYSTEM WORKLOAD BREAKDOWN ---
 System Name                |   Calls | Avg (usec) | Max (usec) |   % Tick | Health Status
 ---------------------------+---------+------------+------------+----------+--------------
-SignalSystem               |    2149 |    11099.6 |      30508 |    64.3% | [CRITICAL]
-PhaseChangeSystem          |    2149 |     1570.4 |      14381 |     9.1% | [OPTIMAL]
-DecaySystem                |    2149 |     1436.2 |       6123 |     8.3% | [OPTIMAL]
-VegetationGrowthSystem     |    2149 |      997.2 |       1997 |     5.8% | [OPTIMAL]
-VegetationYieldSystem      |    2149 |      742.0 |      11030 |     4.3% | [OPTIMAL]
-MatterAssignSystem         |    2149 |      488.8 |      13027 |     2.8% | [OPTIMAL]
-RainSystem                 |    2149 |      481.4 |      25700 |     2.8% | [WARNING]
-ClimateSystem              |    2149 |      273.1 |      15162 |     1.6% | [WARNING]
-VegetationSpawnSystem      |    2149 |       54.4 |     114453 |     0.3% | [WARNING]
-FluidSystem                |    2149 |        9.9 |        746 |     0.1% | [OPTIMAL]
-WeatherSystem              |    2149 |        6.8 |        234 |     0.0% | [OPTIMAL]
-ImpactSolverSystem         |    2149 |        4.3 |         68 |     0.0% | [OPTIMAL]
-CombustionSystem           |    2149 |        2.9 |         86 |     0.0% | [OPTIMAL]
-GasSystem                  |    2149 |        2.9 |         22 |     0.0% | [OPTIMAL]
-TerrainGenSystem           |    2149 |        1.8 |        125 |     0.0% | [OPTIMAL]
-ChemicalReactionSystem     |    2149 |        1.6 |        190 |     0.0% | [OPTIMAL]
+SignalSystem               |    3493 |    36100.9 |      63580 |    83.4% | [CRITICAL]
+VegetationGrowthSystem     |    3493 |     1752.2 |       3459 |     4.0% | [OPTIMAL]
+DecaySystem                |    3493 |     1379.8 |      12023 |     3.2% | [OPTIMAL]
+PhaseChangeSystem          |    3493 |     1368.4 |      15885 |     3.2% | [WARNING]
+VegetationYieldSystem      |    3493 |     1091.8 |      21419 |     2.5% | [WARNING]
+MatterAssignSystem         |    3493 |      949.5 |      34527 |     2.2% | [WARNING]
+ClimateSystem              |    3493 |      224.1 |      15099 |     0.5% | [WARNING]
+RainSystem                 |    3493 |      160.5 |      25842 |     0.4% | [WARNING]
+CreatureAISystem           |    3493 |       55.6 |        135 |     0.1% | [OPTIMAL]
+VegetationSpawnSystem      |    3493 |       48.2 |     165658 |     0.1% | [WARNING]
+CreatureBodySystem         |    3493 |       45.5 |        120 |     0.1% | [OPTIMAL]
+FluidSystem                |    3493 |        9.0 |       1206 |     0.0% | [OPTIMAL]
+CreatureLocomotionSystem   |    3493 |        5.8 |        160 |     0.0% | [OPTIMAL]
+WeatherSystem              |    3493 |        5.3 |         84 |     0.0% | [OPTIMAL]
+ImpactSolverSystem         |    3493 |        3.4 |        105 |     0.0% | [OPTIMAL]
+GasSystem                  |    3493 |        2.4 |         77 |     0.0% | [OPTIMAL]
+CombustionSystem           |    3493 |        2.3 |         75 |     0.0% | [OPTIMAL]
+TerrainGenSystem           |    3493 |        1.5 |         70 |     0.0% | [OPTIMAL]
+ChemicalReactionSystem     |    3493 |        1.4 |        355 |     0.0% | [OPTIMAL]
 ---------------------------+---------+------------+------------+----------+--------------
 
 --- [4] GPU RENDER TEXTURE DIAGNOSTICS ---
 Render system metrics not available or not yet initialized.
 
 --- [5] DIAGNOSTIC VERDICT & RECOMMENDATIONS ---
-[PASS] System is running in GOOD HEALTH with acceptable pacing.
-  - Note: Minor frame drops below 60 FPS detected (2060 frames). Ensure VSync or exponential camera damping is active.
+[WARNING] Simulation load exceeds recommended thresholds.
+  - Average tick latency is elevated (43.30 ms). Consider checking top systems in the breakdown above.
 ================================================================================

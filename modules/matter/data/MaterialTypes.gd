@@ -48,6 +48,8 @@ enum Type {
 	ICOSIDODECAHEDRON = 18,
 	ECTOPLASM      = 19,
 	ORGANIC        = 20,  ## generic living plant matter — grass, leaves, shoots
+	BONE           = 21,  ## skeletal structure, high hardness & yield strength
+	ANIMAL_BLOOD   = 22,  ## biological circulatory fluid
 }
 
 ## Tile type int → material type int
@@ -293,6 +295,26 @@ const DATA: Dictionary = {
 		"moisture": 0.55, "rot_rate": 0.7, "toxicity": 0.0,
 		"hardness": 0.5, "yield_strength": 3.0, "elasticity": 0.7,
 		"nutritional_value": 8,
+	},
+	Type.BONE: {
+		"display_name": "Bone",
+		"state": 0, "density": 1900.0,
+		"melting_point_c": INF, "boiling_point_c": INF,
+		"ignition_temp_c": INF, "conductivity": 0.38, "specific_heat": 1300.0,
+		"flammability": 0.0, "acidity_ph": 7.0, "corrosiveness": 0.0,
+		"moisture": 0.10, "rot_rate": 0.05, "toxicity": 0.0,
+		"hardness": 5.0, "yield_strength": 130.0, "elasticity": 0.15,
+		"nutritional_value": 50,
+	},
+	Type.ANIMAL_BLOOD: {
+		"display_name": "Animal Blood",
+		"state": 1, "density": 1060.0,
+		"melting_point_c": -0.5, "boiling_point_c": 100.5,
+		"ignition_temp_c": INF, "conductivity": 0.55, "specific_heat": 3900.0,
+		"flammability": 0.0, "acidity_ph": 7.4, "corrosiveness": 0.0,
+		"moisture": 0.82, "rot_rate": 0.80, "toxicity": 0.05,
+		"hardness": 0.0, "yield_strength": 0.0, "elasticity": 0.0,
+		"nutritional_value": 120,
 	},
 }
 
