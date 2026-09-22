@@ -25,3 +25,7 @@ var ticks_since_yield: int = 0
 ## Production pauses when the cap is reached. -1 = unlimited.
 ## Fallback when the item type is not defined in VegetationYieldSystem.MAX_YIELD_PER_TILE.
 var max_yield: int = 5
+
+## Minimum growth stage required on host VegetationComponent to produce yield (-1 = no requirement).
+var min_growth_stage: int = 2
+

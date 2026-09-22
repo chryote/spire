@@ -60,6 +60,8 @@ const DATA: Dictionary = {
 		"min_survival_moisture": 0.08,
 		"max_survival_temp":     0.90,
 		"min_survival_temp":     0.02,
+		"ticks_per_yield":       80,
+		"min_yield_stage":       2,
 	},
 
 	Type.TALL_GRASS: {
@@ -86,6 +88,8 @@ const DATA: Dictionary = {
 		"min_survival_moisture": 0.18,
 		"max_survival_temp":     0.88,
 		"min_survival_temp":     0.03,
+		"ticks_per_yield":       60,
+		"min_yield_stage":       2,
 	},
 
 	Type.SHRUB: {

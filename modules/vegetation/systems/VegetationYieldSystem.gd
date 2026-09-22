@@ -18,14 +18,14 @@ const _ItemTypes           = preload("res://modules/item/data/ItemTypes.gd")
 ## Maximum number of items of a specific archetype allowed to exist simultaneously across the entire world.
 ## Prevents wild vegetation (like 12,000 grass tiles) from generating tens of thousands of loose items.
 const GLOBAL_ITEM_CAPS: Dictionary = {
-	_ItemTypes.Type.GRASS: 16384,
+	_ItemTypes.Type.GRASS: 256,
 }
 const DEFAULT_GLOBAL_ITEM_CAP: int = 100000
 
 ## Maximum number of items of a specific archetype allowed on a single tile's inventory from vegetation yield.
 ## Prevents a single tile from accumulating excessive items of a given type.
 const MAX_YIELD_PER_TILE: Dictionary = {
-	_ItemTypes.Type.GRASS: 1,
+	_ItemTypes.Type.GRASS: 5,
 	_ItemTypes.Type.STICK: 8,
 	_ItemTypes.Type.LOG:   2,
 }
@@ -61,6 +61,7 @@ func tick(tick_number: int) -> void:
 
 	var burn_store: Dictionary = reg.get_store(&"BurningComponent")
 	var inv_store:  Dictionary = reg.get_store(&"InventoryComponent")
+	var veg_store:  Dictionary = reg.get_store(&"VegetationComponent")
 
 	for entity_id: int in slice:
 		# Burning plants don't produce
@@ -70,6 +71,13 @@ func tick(tick_number: int) -> void:
 		var yield_comp = yield_store.get(entity_id, null)
 		if yield_comp == null:
 			continue
+
+		# Immature plants do not produce yield
+		if yield_comp.min_growth_stage >= 0:
+			var veg = veg_store.get(entity_id, null)
+			if veg != null and veg.growth_stage < yield_comp.min_growth_stage:
+				continue
+
 		yield_comp.ticks_since_yield += SLICE_COUNT
 
 		if yield_comp.ticks_since_yield < yield_comp.ticks_per_yield:

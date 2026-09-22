@@ -1,1 +1,1 @@
-PASSED: Global hard cap and per-tile cap strictly respected. Final grass units: 3531, global_tracked: 3531, max_cap: 16384, per_tile_cap: 5
+PASSED: Global hard cap and per-tile cap strictly respected. Final grass units: 256, global_tracked: 256, max_cap: 256, per_tile_cap: 5

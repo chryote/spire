@@ -34,7 +34,7 @@ func _test_yield_cap() -> void:
 			initial_grass_count += 1
 
 	print("[Test] Initial grass items in world: %d" % initial_grass_count)
-	var max_cap: int = _VegetationYieldSystem.GLOBAL_ITEM_CAPS.get(_ItemTypes.Type.GRASS, 16384)
+	var max_cap: int = _VegetationYieldSystem.GLOBAL_ITEM_CAPS.get(_ItemTypes.Type.GRASS, 256)
 	print("[Test] Configured global grass cap: %d" % max_cap)
 	assert(max_cap > 0, "Global grass cap should be positive")
 

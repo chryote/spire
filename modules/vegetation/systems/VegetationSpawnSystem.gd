@@ -119,10 +119,11 @@ func _try_spawn(entity_id: int, veg_type: int, biome, reg) -> bool:
 	# --- Attach ItemYieldComponent for grass-type plants ---
 	if veg_type in [_VegetationTypes.Type.GRASS_PATCH, _VegetationTypes.Type.TALL_GRASS]:
 		var yield_comp = _ItemYieldComponent.new()
-		yield_comp.item_type       = _ItemTypes.Type.GRASS
-		yield_comp.material_type   = _MaterialTypes.Type.ORGANIC
-		yield_comp.ticks_per_yield = vd.get("ticks_per_yield", 60) as int
-		yield_comp.max_yield       = 5
+		yield_comp.item_type        = _ItemTypes.Type.GRASS
+		yield_comp.material_type    = _MaterialTypes.Type.ORGANIC
+		yield_comp.ticks_per_yield  = vd.get("ticks_per_yield", 60) as int
+		yield_comp.min_growth_stage = vd.get("min_yield_stage", 2) as int
+		yield_comp.max_yield        = 5
 		reg.add(entity_id, yield_comp)
 
 	# --- Update RenderComponent ---

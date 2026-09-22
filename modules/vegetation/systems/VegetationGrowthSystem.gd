@@ -297,6 +297,7 @@ func _try_spread_fast(
 		child_yield.item_type         = parent_yield.item_type
 		child_yield.material_type     = parent_yield.material_type
 		child_yield.ticks_per_yield   = parent_yield.ticks_per_yield
+		child_yield.min_growth_stage  = parent_yield.min_growth_stage
 		child_yield.max_yield         = parent_yield.max_yield
 		child_yield.ticks_since_yield = 0
 		reg.add(target_id, child_yield)
