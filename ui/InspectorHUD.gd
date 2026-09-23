@@ -15,6 +15,9 @@ const _MindEmbeddings      = preload("res://modules/creature/data/MindEmbeddings
 const _TileAffordance      = preload("res://modules/signal/data/TileAffordance.gd")
 const _SignalTypes         = preload("res://modules/signal/data/SignalTypes.gd")
 const _CreatureComponent   = preload("res://modules/creature/components/CreatureComponent.gd")
+const _TraitComponent      = preload("res://modules/creature/components/TraitComponent.gd")
+const _TraitTypes          = preload("res://modules/creature/data/TraitTypes.gd")
+const _GrowthComponent     = preload("res://modules/creature/components/GrowthComponent.gd")
 const _PositionComponent   = preload("res://modules/creature/components/PositionComponent.gd")
 const _BodyComponent       = preload("res://modules/creature/components/body/BodyComponent.gd")
 const _MindComponent       = preload("res://modules/creature/components/mind/MindComponent.gd")
@@ -73,6 +76,8 @@ var selected_tile: Vector2i = Vector2i(-1, -1)
 var selected_creature_eid: int = -1
 var _update_timer: float = 0.0
 const UPDATE_INTERVAL: float = 0.1
+
+var creature_traits_label: RichTextLabel = null
 
 var _selection_box: Node2D = null
 
@@ -536,9 +541,16 @@ func _render_creature(reg, ceid: int) -> void:
 	if tab_container != null:
 		tab_container.set_tab_title(1, "Creature (%s)" % species_name)
 
+	var growth: _GrowthComponent = reg.get_component(ceid, &"CreatureGrowthComponent")
+	var stage_str: String = ""
+	if growth != null:
+		var s_name: String = _CreatureTypes.get_stage_name(growth.current_stage)
+		var scale_pct: int = int(round(growth.current_scale * 100.0))
+		stage_str = " [%s, %d%% Scale]" % [s_name, scale_pct]
+
 	if creature_header_label != null:
-		creature_header_label.text = "%s \"%s\" (eid=%d) — %s (Age: %d)" % [
-			species_name, creature.creature_name, ceid, status_str, creature.age_ticks
+		creature_header_label.text = "%s \"%s\" (eid=%d)%s — %s (Age: %d)" % [
+			species_name, creature.creature_name, ceid, stage_str, status_str, creature.age_ticks
 		]
 
 	# --- Thought & Action ---
@@ -617,6 +629,88 @@ func _render_creature(reg, ceid: int) -> void:
 			else:
 				util_parts.append("[color=#99aacc]%s: %.2f[/color]" % [a_str, u_val])
 		creature_utilities_label.text = "[b]Decision Utilities:[/b] " + ("  |  ".join(util_parts))
+
+	# --- Traits & Status Section ---
+	if creature_traits_label == null and creature_section != null:
+		var trait_vbox := VBoxContainer.new()
+		trait_vbox.name = "TraitsVBox"
+		var trait_title := Label.new()
+		trait_title.text = "Genetic Profile & Active Status:"
+		trait_title.add_theme_color_override("font_color", Color(0.4, 0.85, 1.0, 1.0))
+		trait_title.add_theme_font_size_override("font_size", 11)
+		trait_vbox.add_child(trait_title)
+
+		creature_traits_label = RichTextLabel.new()
+		creature_traits_label.name = "CreatureTraitsLabel"
+		creature_traits_label.bbcode_enabled = true
+		creature_traits_label.fit_content = true
+		creature_traits_label.scroll_active = false
+		creature_traits_label.add_theme_font_size_override("normal_font_size", 10)
+		creature_traits_label.add_theme_font_size_override("bold_font_size", 10)
+		trait_vbox.add_child(creature_traits_label)
+
+		creature_section.add_child(trait_vbox)
+		if creature_utilities_label != null:
+			creature_section.move_child(trait_vbox, creature_utilities_label.get_index() + 1)
+
+	if creature_traits_label != null:
+		var traits: _TraitComponent = reg.get_component(ceid, &"TraitComponent")
+		if traits != null:
+			var t_lines: Array[String] = []
+
+			# Life Stage & Growth Progress
+			var growth_c: _GrowthComponent = reg.get_component(ceid, &"CreatureGrowthComponent")
+			if growth_c != null:
+				var st_name: String = _CreatureTypes.get_stage_name(growth_c.current_stage)
+				var prog_pct: int = int(round(growth_c.growth_progress * 100.0))
+				var stunt_str: String = " [color=#ff6666](Growth Stunted: Malnourished)[/color]" if growth_c.is_stunted else ""
+				t_lines.append("[b]Life Stage:[/b] [color=#e0ffff]%s[/color] (Maturation: %d%%)%s" % [st_name, prog_pct, stunt_str])
+
+			# Genetic traits
+			var g_parts: Array[String] = []
+			for tid: int in traits.genetic_traits:
+				var tdata: Dictionary = _TraitTypes.get_data(tid)
+				var tname: String = tdata.get("name", "Unknown")
+				var tcol: Color = tdata.get("color", Color.WHITE)
+				g_parts.append("[color=#%s][b]%s[/b][/color]" % [tcol.to_html(false), tname])
+			if g_parts.is_empty():
+				t_lines.append("[b]Genetics:[/b] [color=#888888]None (Standard Profile)[/color]")
+			else:
+				t_lines.append("[b]Genetics:[/b] " + ", ".join(g_parts))
+
+			# Active Buffs
+			var b_parts: Array[String] = []
+			for bid: int in traits.active_buffs:
+				var binfo = traits.active_buffs[bid]
+				var bdata: Dictionary = _TraitTypes.get_data(bid)
+				var bname: String = bdata.get("name", "Buff")
+				var bcol: Color = bdata.get("color", Color(0.4, 0.9, 0.4))
+				b_parts.append("[color=#%s]%s (%dt)[/color]" % [bcol.to_html(false), bname, binfo["duration"]])
+
+			# Active Debuffs
+			var d_parts: Array[String] = []
+			for did: int in traits.active_debuffs:
+				var dinfo = traits.active_debuffs[did]
+				var ddata: Dictionary = _TraitTypes.get_data(did)
+				var dname: String = ddata.get("name", "Debuff")
+				var dcol: Color = ddata.get("color", Color(0.9, 0.4, 0.3))
+				d_parts.append("[color=#%s]%s (%dt)[/color]" % [dcol.to_html(false), dname, dinfo["duration"]])
+
+			if not b_parts.is_empty() or not d_parts.is_empty():
+				var effects_str: String = ""
+				if not b_parts.is_empty():
+					effects_str += "[b]Buffs:[/b] " + ", ".join(b_parts)
+				if not d_parts.is_empty():
+					if effects_str != "":
+						effects_str += "  |  "
+					effects_str += "[b]Debuffs:[/b] " + ", ".join(d_parts)
+				t_lines.append(effects_str)
+			else:
+				t_lines.append("[b]Status Effects:[/b] [color=#888888]No active buffs/debuffs[/color]")
+
+			creature_traits_label.text = "\n".join(t_lines)
+		else:
+			creature_traits_label.text = "[color=#888888]No trait component attached[/color]"
 
 	# --- Body Condition ---
 	var body: _BodyComponent = reg.get_component(ceid, &"BodyComponent")

@@ -15,6 +15,7 @@ const _MindComponent       = preload("res://modules/creature/components/mind/Min
 const _MemoryComponent     = preload("res://modules/creature/components/mind/MemoryComponent.gd")
 const _ActionPlanComponent = preload("res://modules/creature/components/mind/ActionPlanComponent.gd")
 const _MindEmbeddings      = preload("res://modules/creature/data/MindEmbeddings.gd")
+const _TraitComponent      = preload("res://modules/creature/components/TraitComponent.gd")
 const _SignalTypes         = preload("res://modules/signal/data/SignalTypes.gd")
 const _TileAffordance      = preload("res://modules/signal/data/TileAffordance.gd")
 
@@ -34,6 +35,7 @@ func tick(tick_number: int) -> void:
 	var mind_store: Dictionary     = reg.get_store(&"MindComponent")
 	var mem_store: Dictionary      = reg.get_store(&"MemoryComponent")
 	var plan_store: Dictionary     = reg.get_store(&"ActionPlanComponent")
+	var trait_store: Dictionary    = reg.get_store(&"TraitComponent")
 
 	for eid: int in creature_store:
 		var creature: _CreatureComponent = creature_store[eid]
@@ -44,6 +46,7 @@ func tick(tick_number: int) -> void:
 		var mind: _MindComponent         = mind_store.get(eid, null)
 		var mem: _MemoryComponent        = mem_store.get(eid, null)
 		var plan: _ActionPlanComponent   = plan_store.get(eid, null)
+		var traits: _TraitComponent      = trait_store.get(eid, null)
 
 		if pos_comp == null or mind == null or plan == null:
 			continue
@@ -56,9 +59,10 @@ func tick(tick_number: int) -> void:
 		var sig_data: Dictionary = world.signals.get_signals_at(cur_pos, 0.01)
 		mind.perceived_signals = sig_data
 
+		var hazard_sens: float = traits.get_stat_multiplier(&"hazard_sensitivity", 1.0) if traits != null else 1.0
 		var hazard: float = sig_data.get(_SignalTypes.HAZARD, 0.0) as float
 		if hazard > 0.05:
-			mind.fear = clampf(mind.fear + hazard * 0.4, 0.0, 1.0)
+			mind.fear = clampf(mind.fear + hazard * 0.4 * hazard_sens, 0.0, 1.0)
 		else:
 			mind.fear = maxf(0.0, mind.fear - 0.02)
 
@@ -78,6 +82,8 @@ func tick(tick_number: int) -> void:
 			_MindEmbeddings.Action.IDLE
 		]:
 			var u: float = _MindEmbeddings.evaluate_utility(mind.drives, sig_data, act)
+			if traits != null:
+				u = traits.apply_action_weight(act, u)
 			mind.action_utilities[act] = u
 			if u > highest_utility:
 				highest_utility = u

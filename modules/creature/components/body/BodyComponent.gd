@@ -83,3 +83,41 @@ func are_vitals_functional(reg) -> bool:
 				if wear >= 1.0:
 					return false
 	return true
+
+## Proportionally rescales blood volume and anatomical parts (limbs and organs).
+func rescale_anatomy(reg, new_scale: float, old_scale: float) -> void:
+	if old_scale <= 0.001 or new_scale <= 0.001:
+		return
+	var factor: float = new_scale / old_scale
+
+	# Rescale blood volume
+	max_blood_volume = maxf(0.1, max_blood_volume * factor)
+	blood_volume = clampf(blood_volume * factor, 0.0, max_blood_volume)
+
+	if reg == null:
+		return
+
+	var item_store: Dictionary = reg.get_store(&"ItemComponent")
+	for eid: int in limbs.values():
+		var item = item_store.get(eid, null)
+		if item != null:
+			item.total_volume *= factor
+			item.total_mass *= factor
+			for p_name in item.parts:
+				var part = item.parts[p_name]
+				if part.has("volume"):
+					part["volume"] *= factor
+				if part.has("mass"):
+					part["mass"] *= factor
+
+	for eid: int in organs.values():
+		var item = item_store.get(eid, null)
+		if item != null:
+			item.total_volume *= factor
+			item.total_mass *= factor
+			for p_name in item.parts:
+				var part = item.parts[p_name]
+				if part.has("volume"):
+					part["volume"] *= factor
+				if part.has("mass"):
+					part["mass"] *= factor

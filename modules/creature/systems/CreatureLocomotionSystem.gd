@@ -14,6 +14,7 @@ const _MindComponent       = preload("res://modules/creature/components/mind/Min
 const _MemoryComponent     = preload("res://modules/creature/components/mind/MemoryComponent.gd")
 const _ActionPlanComponent = preload("res://modules/creature/components/mind/ActionPlanComponent.gd")
 const _MindEmbeddings      = preload("res://modules/creature/data/MindEmbeddings.gd")
+const _TraitComponent      = preload("res://modules/creature/components/TraitComponent.gd")
 const _VegetationComponent = preload("res://modules/vegetation/components/VegetationComponent.gd")
 const _InventoryComponent  = preload("res://modules/item/components/InventoryComponent.gd")
 const _ItemComponent       = preload("res://modules/item/components/ItemComponent.gd")
@@ -39,6 +40,7 @@ func tick(tick_number: int) -> void:
 	var mind_store: Dictionary     = reg.get_store(&"MindComponent")
 	var plan_store: Dictionary     = reg.get_store(&"ActionPlanComponent")
 	var mem_store: Dictionary      = reg.get_store(&"MemoryComponent")
+	var trait_store: Dictionary    = reg.get_store(&"TraitComponent")
 
 	var any_moved: bool = false
 
@@ -51,6 +53,7 @@ func tick(tick_number: int) -> void:
 		var mind: _MindComponent         = mind_store.get(eid, null)
 		var plan: _ActionPlanComponent   = plan_store.get(eid, null)
 		var mem: _MemoryComponent        = mem_store.get(eid, null)
+		var traits: _TraitComponent      = trait_store.get(eid, null)
 
 		if pos_comp == null or plan == null:
 			continue
@@ -70,11 +73,13 @@ func tick(tick_number: int) -> void:
 				pos_comp.position = next_pos
 				any_moved = true
 
-				# Cooldown modified by leg mobility
+				# Cooldown modified by leg mobility and traits
 				var interval: int = pos_comp.base_move_interval
+				if traits != null:
+					interval += traits.get_stat_offset(&"move_cooldown")
 				if creature.mobility_factor < 0.99:
 					interval = int(float(interval) / maxf(0.2, creature.mobility_factor))
-				pos_comp.move_cooldown_ticks = interval
+				pos_comp.move_cooldown_ticks = maxi(1, interval)
 
 				if mem != null:
 					mem.record_event(next_pos, &"stepped", tick_number, 0.5)

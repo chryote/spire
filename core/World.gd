@@ -38,6 +38,8 @@ const _VegetationGrowthSystem= preload("res://modules/vegetation/systems/Vegetat
 const _VegetationYieldSystem = preload("res://modules/vegetation/systems/VegetationYieldSystem.gd")
 const _ImpactSolverSystem    = preload("res://modules/matter/systems/ImpactSolverSystem.gd")
 const _SignalSystem          = preload("res://modules/signal/systems/SignalSystem.gd")
+const _CreatureGrowthSystem     = preload("res://modules/creature/systems/CreatureGrowthSystem.gd")
+const _TraitSystem              = preload("res://modules/creature/systems/TraitSystem.gd")
 const _CreatureBodySystem       = preload("res://modules/creature/systems/CreatureBodySystem.gd")
 const _CreatureAISystem         = preload("res://modules/creature/systems/CreatureAISystem.gd")
 const _CreatureLocomotionSystem = preload("res://modules/creature/systems/CreatureLocomotionSystem.gd")
@@ -312,7 +314,9 @@ func _register_modules() -> void:
 	signals = _SignalSystem.new()
 	_add_system(signals, 220)
 
-	# --- Creature module (priorities 225, 230, 235) ---
+	# --- Creature module (priorities 223, 224, 225, 230, 235) ---
+	_add_system(_CreatureGrowthSystem.new(), 223)
+	_add_system(_TraitSystem.new(), 224)
 	_add_system(_CreatureBodySystem.new(), 225)
 	_add_system(_CreatureAISystem.new(), 230)
 	_add_system(_CreatureLocomotionSystem.new(), 235)

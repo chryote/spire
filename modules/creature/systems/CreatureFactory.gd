@@ -12,6 +12,9 @@ const _BodyComponent       = preload("res://modules/creature/components/body/Bod
 const _MindComponent       = preload("res://modules/creature/components/mind/MindComponent.gd")
 const _MemoryComponent     = preload("res://modules/creature/components/mind/MemoryComponent.gd")
 const _ActionPlanComponent = preload("res://modules/creature/components/mind/ActionPlanComponent.gd")
+const _TraitComponent      = preload("res://modules/creature/components/TraitComponent.gd")
+const _GrowthComponent     = preload("res://modules/creature/components/GrowthComponent.gd")
+const _TraitTypes          = preload("res://modules/creature/data/TraitTypes.gd")
 const _RenderComponent     = preload("res://modules/rendering/components/RenderComponent.gd")
 const _ItemFactory         = preload("res://modules/item/systems/ItemFactory.gd")
 const _ItemTypes           = preload("res://modules/item/data/ItemTypes.gd")
@@ -21,7 +24,9 @@ static func create(
 	world: Node,
 	species_type: int,
 	spawn_pos: Vector2i,
-	name_override: String = ""
+	name_override: String = "",
+	initial_traits: Array[int] = [],
+	start_stage: int = -1
 ) -> int:
 	if world == null:
 		return -1
@@ -94,5 +99,60 @@ static func create(
 	render_comp.bg_color = spec_data.get("bg_color", Color.BLACK)
 	render_comp.z_layer = 10  # Drawn on top of terrain
 	world.add_component(creature_eid, render_comp)
+
+	# 8. Trait & Genetic Profile Component
+	var trait_comp := _TraitComponent.new()
+	var innate: Array = spec_data.get("innate_traits", [])
+	for t in innate:
+		trait_comp.add_genetic_trait(t)
+
+	if not initial_traits.is_empty():
+		for t in initial_traits:
+			trait_comp.add_genetic_trait(t)
+	else:
+		var pool: Array = spec_data.get("trait_pool", [])
+		if not pool.is_empty():
+			if randf() < 0.60:
+				var rolled = pool[randi() % pool.size()]
+				trait_comp.add_genetic_trait(rolled)
+
+	# Apply initial trait stat modifiers
+	if trait_comp.get_stat_multiplier(&"stomach_capacity_mult") != 1.0:
+		creature_comp.stomach_capacity *= trait_comp.get_stat_multiplier(&"stomach_capacity_mult")
+		creature_comp.stomach_fill = creature_comp.stomach_capacity * 0.4
+	if trait_comp.get_stat_offset(&"move_cooldown") != 0:
+		pos_comp.base_move_interval = maxi(1, pos_comp.base_move_interval + trait_comp.get_stat_offset(&"move_cooldown"))
+
+	world.add_component(creature_eid, trait_comp)
+
+	# 9. Growth & Maturation Component
+	var growth_comp := _GrowthComponent.new()
+	growth_comp.current_stage = start_stage if start_stage >= 0 else _CreatureTypes.GrowthStage.ADULT
+	growth_comp.base_mass = spec_data.get("base_mass", 20.0)
+	growth_comp.base_blood_volume = spec_data.get("blood_volume", 2.5)
+	growth_comp.base_stomach_capacity = creature_comp.stomach_capacity
+
+	var spec_growth: Dictionary = _CreatureTypes.get_growth_profile(species_type)
+	var stages_cfg: Dictionary = spec_growth.get("stages", {})
+	var stage_cfg: Dictionary = stages_cfg.get(growth_comp.current_stage, {})
+	var body_scale: float = stage_cfg.get("body_scale", 1.0)
+	growth_comp.current_scale = body_scale
+
+	if growth_comp.current_stage != _CreatureTypes.GrowthStage.ADULT:
+		body_comp.rescale_anatomy(world.get_registry(), body_scale, 1.0)
+		creature_comp.stomach_capacity *= body_scale
+		creature_comp.stomach_fill = creature_comp.stomach_capacity * 0.4
+		var stage_glyph: String = stage_cfg.get("glyph", "")
+		if stage_glyph != "":
+			render_comp.glyph = stage_glyph
+
+		var lost: Array = stage_cfg.get("traits_lost", [])
+		for tid in lost:
+			trait_comp.remove_genetic_trait(tid)
+		var gained: Array = stage_cfg.get("traits_gained", [])
+		for tid in gained:
+			trait_comp.add_genetic_trait(tid)
+
+	world.add_component(creature_eid, growth_comp)
 
 	return creature_eid
