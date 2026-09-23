@@ -26,6 +26,7 @@ enum Action {
 	FLEE   = 3,
 	REST   = 4,
 	WANDER = 5,
+	ATTACK = 6,
 }
 
 ## Action prototype vectors in R^8 representing optimal drive alignment.
@@ -37,6 +38,7 @@ const ACTION_PROTOTYPES: Dictionary = {
 	Action.REST:   [0.05, 0.05, 0.00, 1.00, 0.00, 0.20, 0.50, 0.00],
 	Action.WANDER: [0.20, 0.10, 0.00, 0.00, 0.90, 0.00, 0.20, 0.10],
 	Action.IDLE:   [0.05, 0.05, 0.00, 0.10, 0.10, 0.00, 0.20, 0.00],
+	Action.ATTACK: [0.30, 0.00, 0.35, 0.00, 0.10, 0.65, 0.00, 0.00],
 }
 
 ## Create a blank zeroed embedding vector.
@@ -127,5 +129,13 @@ static func evaluate_utility(
 
 		Action.IDLE:
 			return 0.08
+
+		Action.ATTACK:
+			var pain: float = drives[Drive.PAIN]
+			var fear: float = drives[Drive.FEAR]
+			var hazard: float = perception.get(&"hazard", 0.0) as float
+			if pain > 0.3 or (fear > 0.5 and hazard > 0.4):
+				return clampf(pain * 0.7 + fear * 0.5, 0.0, 1.0)
+			return 0.0
 
 	return clampf(base_score, 0.0, 1.0)

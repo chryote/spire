@@ -60,6 +60,9 @@ class ImpactParams extends RefCounted:
 	## Optional custom striker sharpness multiplier (1.0 = standard, >1.0 = razor).
 	var sharpness: float = 1.0
 
+	## Optional explicit striking material ID override (e.g. BONE for claws/horns). Defaults to -1 (use entity matter).
+	var striker_material_id: int = -1
+
 	## Convenience factory creating params from mass and velocity.
 	static func from_motion(p_mass: float, p_velocity: Vector2, p_area: float = 0.0001, p_form: int = Form.BLUNT) -> ImpactParams:
 		var params = ImpactParams.new()

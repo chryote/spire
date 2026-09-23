@@ -75,6 +75,7 @@ func tick(tick_number: int) -> void:
 
 		for act: int in [
 			_MindEmbeddings.Action.FLEE,
+			_MindEmbeddings.Action.ATTACK,
 			_MindEmbeddings.Action.GRAZE,
 			_MindEmbeddings.Action.DRINK,
 			_MindEmbeddings.Action.REST,
@@ -110,6 +111,9 @@ func tick(tick_number: int) -> void:
 
 			_MindEmbeddings.Action.REST:
 				_plan_rest(cur_pos, plan, mem, tick_number)
+
+			_MindEmbeddings.Action.ATTACK:
+				_plan_attack(cur_pos, plan, pos_comp)
 
 			_MindEmbeddings.Action.IDLE:
 				plan.clear_path()
@@ -401,3 +405,12 @@ func _build_simple_path(from_pos: Vector2i, to_pos: Vector2i) -> Array[Vector2i]
 				break
 
 	return path
+ 
+func _plan_attack(cur_pos: Vector2i, plan: _ActionPlanComponent, pos_comp: _PositionComponent) -> void:
+	if plan.target_tile != Vector2i(-1, -1) and cur_pos.distance_squared_to(plan.target_tile) <= 2:
+		plan.clear_path()
+		return
+	var facing_pos: Vector2i = cur_pos + pos_comp.facing
+	if world.is_valid_position(facing_pos):
+		plan.target_tile = facing_pos
+		plan.clear_path()

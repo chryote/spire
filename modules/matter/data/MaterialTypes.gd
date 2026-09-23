@@ -213,7 +213,7 @@ const DATA: Dictionary = {
 		"ignition_temp_c": INF, "conductivity": 0.5, "specific_heat": 3500.0,
 		"flammability": 0.0, "acidity_ph": 5.5, "corrosiveness": 0.0,
 		"moisture": 0.75, "rot_rate": 0.50, "toxicity": 0.2,
-		"hardness": 1.5, "yield_strength": 10.0, "elasticity": 0.8,
+		"hardness": 1.5, "yield_strength": 2.0, "elasticity": 0.8,
 		"nutritional_value": 250,
 	},
 	Type.SPIDER_SILK: {

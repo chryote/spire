@@ -118,6 +118,10 @@ static func _solve_solid_vs_solid(
 	# Pressure = (Energy / depth) / Area / 1,000,000
 	var base_pressure: float = (energy / (depth_ref * area * 1_000_000.0)) * form_mult * params.sharpness
 
+	# Yield & Structural Failure Evaluation
+	var t_yield: float = maxf(0.1, t.yield_strength)
+	var s_yield: float = maxf(0.1, s.yield_strength)
+
 	# Hardness advantage scaling (Mohs scale scratch & penetration factor)
 	var s_hard: float = maxf(0.1, s.hardness)
 	var t_hard: float = maxf(0.1, t.hardness)
@@ -136,22 +140,20 @@ static func _solve_solid_vs_solid(
 		var blunt_factor: float = pow(clampf(1.0 / hard_ratio, 1.0, 5.0), 1.2)
 		target_stress = base_pressure / blunt_factor
 		striker_stress = base_pressure * blunt_factor
-
-	# Yield & Structural Failure Evaluation
-	var t_yield: float = maxf(0.1, t.yield_strength)
-	var s_yield: float = maxf(0.1, s.yield_strength)
+		# Physical limit: softer material deforms/crushes, capping transmitted stress at striker yield
+		target_stress = minf(target_stress, s_yield * 1.25)
 
 	# Damage calculation
 	if target_stress > t_yield:
 		var excess_ratio = (target_stress - t_yield) / t_yield
-		res.damage_to_target = excess_ratio * minf(energy * 0.4, t_yield * 2.0)
-		if target_stress > t_yield * 1.5 or res.damage_to_target >= t_yield:
+		res.damage_to_target = minf(energy, excess_ratio * minf(energy * 0.4, t_yield * 2.0))
+		if res.damage_to_target >= t_yield:
 			res.target_fractured = true
 
 	if striker_stress > s_yield:
 		var excess_ratio_s = (striker_stress - s_yield) / s_yield
-		res.damage_to_striker = excess_ratio_s * minf(energy * 0.3, s_yield * 2.0)
-		if striker_stress > s_yield * 1.5 or res.damage_to_striker >= s_yield:
+		res.damage_to_striker = minf(energy, excess_ratio_s * minf(energy * 0.3, s_yield * 2.0))
+		if res.damage_to_striker >= s_yield:
 			res.striker_fractured = true
 
 	# Restitution & Rebound
@@ -178,7 +180,8 @@ static func _solve_solid_vs_solid(
 		res.outcome = _ImpactTypes.Outcome.SHATTERED
 	elif res.damage_to_target > 0.0:
 		res.outcome = _ImpactTypes.Outcome.DEFORMED
-		res.penetration_depth = clampf(target_stress / (t_yield * 3.0), 0.05, 0.8)
+		var form_depth_factor: float = 0.35 if params.form == _ImpactTypes.Form.SLASH else 0.8
+		res.penetration_depth = clampf((res.damage_to_target / t_yield) * form_depth_factor, 0.05, 0.8)
 	else:
 		res.outcome = _ImpactTypes.Outcome.DEFLECTED
 		res.penetration_depth = 0.0
@@ -476,6 +479,10 @@ func resolve_entity_impact(
 				if effective_params.kinetic_energy <= 0.1:
 					effective_params.kinetic_energy = mold_params.kinetic_energy
 
+	if effective_params != null and effective_params.striker_material_id != -1:
+		s_matter = _MatterComponent.new()
+		_MaterialTypes.apply_to(s_matter, effective_params.striker_material_id)
+
 	var result: _ImpactTypes.ImpactResult = solve_impact(s_matter, t_matter, effective_params)
 
 	# Check for explosive payload in striker item (e.g. Blasting Warhammer)
@@ -511,6 +518,28 @@ func resolve_entity_impact(
 	# 1. Apply structural damage to target
 	if result.damage_to_target > 0.0:
 		t_matter.yield_strength = maxf(0.0, t_matter.yield_strength - result.damage_to_target)
+		# Propagate creature injury if target is a creature or creature limb
+		var target_creature = reg.get_component(target_eid, &"CreatureComponent")
+		var target_body = reg.get_component(target_eid, &"BodyComponent")
+		var target_mind = reg.get_component(target_eid, &"MindComponent")
+		if target_body == null and reg.has(target_eid, &"ItemComponent"):
+			var t_item = reg.get_component(target_eid, &"ItemComponent")
+			if t_item != null and t_item.container_id != -1:
+				target_creature = reg.get_component(t_item.container_id, &"CreatureComponent")
+				target_body = reg.get_component(t_item.container_id, &"BodyComponent")
+				target_mind = reg.get_component(t_item.container_id, &"MindComponent")
+
+		if target_creature != null:
+			target_creature.health = maxf(0.0, target_creature.health - result.damage_to_target)
+			if target_creature.health <= 0.0:
+				target_creature.is_alive = false
+
+		if target_body != null:
+			target_body.bleed_rate = minf(0.5, target_body.bleed_rate + result.damage_to_target * 0.002)
+		if target_mind != null:
+			target_mind.pain = minf(1.0, target_mind.pain + result.damage_to_target * 0.02)
+			target_mind.fear = minf(1.0, target_mind.fear + 0.35)
+
 		if result.target_fractured or t_matter.yield_strength <= 0.0:
 			_handle_target_fracture(target_eid, t_matter, result, reg)
 
@@ -520,6 +549,10 @@ func resolve_entity_impact(
 		if s_item != null and s_item.parts.has(s_item.primary_part):
 			var wear_delta = result.damage_to_striker / maxf(1.0, s_matter.yield_strength + result.damage_to_striker)
 			s_item.parts[s_item.primary_part]["wear"] = clampf(s_item.parts[s_item.primary_part]["wear"] + wear_delta, 0.0, 1.0)
+		if s_item != null and s_item.container_id != -1:
+			var s_mind = reg.get_component(s_item.container_id, &"MindComponent")
+			if s_mind != null:
+				s_mind.pain = minf(1.0, s_mind.pain + result.damage_to_striker * 0.01)
 		if result.striker_fractured or s_matter.yield_strength <= 0.0:
 			_handle_striker_fracture(striker_eid, s_matter, result, reg)
 
@@ -575,6 +608,12 @@ func _handle_target_fracture(target_eid: int, t_matter, result: _ImpactTypes.Imp
 	# If target has vegetation, splinter and remove it
 	if reg.has(target_eid, &"VegetationComponent"):
 		reg.remove(target_eid, &"VegetationComponent")
+
+	# If target is creature, lethal fracture
+	var creature = reg.get_component(target_eid, &"CreatureComponent")
+	if creature != null:
+		creature.is_alive = false
+		creature.health = 0.0
 
 	# If target is terrain tile, crumble into debris
 	var tile_comp = reg.get_component(target_eid, &"TileComponent")

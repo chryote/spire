@@ -140,6 +140,7 @@ var _registry = null   # ComponentRegistry instance
 var _sim_systems: Array = []
 var impact_solver = null
 var signals = null
+var creature_locomotion = null
 
 # ---------------------------------------------------------------------------
 # Signals
@@ -319,7 +320,8 @@ func _register_modules() -> void:
 	_add_system(_TraitSystem.new(), 224)
 	_add_system(_CreatureBodySystem.new(), 225)
 	_add_system(_CreatureAISystem.new(), 230)
-	_add_system(_CreatureLocomotionSystem.new(), 235)
+	creature_locomotion = _CreatureLocomotionSystem.new()
+	_add_system(creature_locomotion, 235)
 
 	# Sort ascending by priority so lower numbers execute first
 	_sim_systems.sort_custom(func(a, b) -> bool: return a.priority < b.priority)

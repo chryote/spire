@@ -18,6 +18,8 @@ const _TraitTypes          = preload("res://modules/creature/data/TraitTypes.gd"
 const _RenderComponent     = preload("res://modules/rendering/components/RenderComponent.gd")
 const _ItemFactory         = preload("res://modules/item/systems/ItemFactory.gd")
 const _ItemTypes           = preload("res://modules/item/data/ItemTypes.gd")
+const _MatterComponent     = preload("res://modules/matter/components/MatterComponent.gd")
+const _MaterialTypes       = preload("res://modules/matter/data/MaterialTypes.gd")
 
 ## Instantiates a creature entity and its physical anatomical sub-entities.
 static func create(
@@ -66,6 +68,17 @@ static func create(
 		if limb_item != null:
 			limb_item.container_id = creature_eid
 			limb_item.display_name = "%s's %s" % [creature_comp.creature_name, limb_name.capitalize()]
+			var target_vol: float = cfg.get("volume", 0.0) as float
+			if target_vol > 0.0 and limb_item.total_volume > 0.0:
+				var scale_factor: float = target_vol / limb_item.total_volume
+				limb_item.total_volume = target_vol
+				limb_item.total_mass *= scale_factor
+				for p_name in limb_item.parts:
+					var part = limb_item.parts[p_name]
+					if part.has("volume"):
+						part["volume"] *= scale_factor
+					if part.has("mass"):
+						part["mass"] *= scale_factor
 		body_comp.limbs[limb_name] = limb_eid
 
 	var organs_cfg: Dictionary = anatomy.get("organs", {})
@@ -76,9 +89,27 @@ static func create(
 		if organ_item != null:
 			organ_item.container_id = creature_eid
 			organ_item.display_name = "%s's %s" % [creature_comp.creature_name, organ_name.capitalize()]
+			var target_vol: float = cfg.get("volume", 0.0) as float
+			if target_vol > 0.0 and organ_item.total_volume > 0.0:
+				var scale_factor: float = target_vol / organ_item.total_volume
+				organ_item.total_volume = target_vol
+				organ_item.total_mass *= scale_factor
+				for p_name in organ_item.parts:
+					var part = organ_item.parts[p_name]
+					if part.has("volume"):
+						part["volume"] *= scale_factor
+					if part.has("mass"):
+						part["mass"] *= scale_factor
 		body_comp.organs[organ_name] = organ_eid
 
 	world.add_component(creature_eid, body_comp)
+
+	# 3b. Physical Matter Component for Root Creature Entity (living organic flesh)
+	var creature_matter := _MatterComponent.new()
+	_MaterialTypes.apply_to(creature_matter, _MaterialTypes.Type.RAW_MEAT)
+	creature_matter.temperature_c = body_comp.body_temperature_c
+	creature_matter.moisture = 0.70
+	world.add_component(creature_eid, creature_matter)
 
 	# 4. Cognitive Mind Component
 	var mind_comp := _MindComponent.new()

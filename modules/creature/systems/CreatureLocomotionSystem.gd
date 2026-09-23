@@ -23,6 +23,10 @@ const _ItemTypes           = preload("res://modules/item/data/ItemTypes.gd")
 const _TileAffordance      = preload("res://modules/signal/data/TileAffordance.gd")
 const _FluidComponent     = preload("res://modules/matter/components/FluidComponent.gd")
 const _MaterialTypes      = preload("res://modules/matter/data/MaterialTypes.gd")
+const _CreatureTypes      = preload("res://modules/creature/data/CreatureTypes.gd")
+const _CreatureKinematics = preload("res://modules/creature/data/CreatureKinematics.gd")
+const _ImpactEventComponent = preload("res://modules/matter/components/ImpactEventComponent.gd")
+const _BodyComponent      = preload("res://modules/creature/components/body/BodyComponent.gd")
 
 func initialize() -> void:
 	print("[CreatureLocomotionSystem] Initialized. Priority 235.")
@@ -102,6 +106,10 @@ func tick(tick_number: int) -> void:
 			# Check if creature is at target or resting in place
 			if pos_comp.position == plan.target_tile or plan.path_queue.is_empty():
 				_execute_rest(eid, pos_comp.position, creature, mind, mem, plan, tick_number)
+		elif plan.current_goal == _MindEmbeddings.Action.ATTACK:
+			# Check if creature is adjacent to target or in range
+			if pos_comp.position.distance_squared_to(plan.target_tile) <= 2 or plan.path_queue.is_empty():
+				_execute_attack(eid, pos_comp, creature, mind, plan, traits, tick_number)
 
 	if any_moved:
 		world.mark_render_dirty()
@@ -294,4 +302,119 @@ func _execute_rest(
 		print("[Creature] %s resting at %s. Fatigue: %.2f." % [
 			creature.creature_name, pos, mind.fatigue
 		])
+
+## Queues an asynchronous physical impact event (Option B) for a creature against a target entity.
+func queue_creature_impact(
+	creature_eid: int,
+	target_eid: int,
+	attack_name: String = "",
+	target_velocity: Vector2 = Vector2.ZERO
+) -> _ImpactEventComponent:
+	if world == null:
+		return null
+	var reg = world.get_registry()
+	if reg == null:
+		return null
+
+	var creature: _CreatureComponent = reg.get_component(creature_eid, &"CreatureComponent")
+	var pos_comp: _PositionComponent = reg.get_component(creature_eid, &"PositionComponent")
+	var body: _BodyComponent         = reg.get_component(creature_eid, &"BodyComponent")
+	var traits: _TraitComponent      = reg.get_component(creature_eid, &"TraitComponent")
+	if creature == null or body == null:
+		return null
+
+	var attacks: Dictionary = _CreatureTypes.get_natural_attacks(creature.species_type)
+	if attacks.is_empty():
+		return null
+
+	var chosen_attack: String = attack_name
+	if chosen_attack == "" or not attacks.has(chosen_attack):
+		chosen_attack = attacks.keys()[0]
+	var attack_cfg: Dictionary = attacks[chosen_attack]
+
+	var limb_name: String = attack_cfg.get("limb", "head")
+	var limb_eid: int = body.limbs.get(limb_name, -1)
+	var striker_eid: int = limb_eid if limb_eid != -1 else creature_eid
+
+	var strike_dir := Vector2.RIGHT
+	if pos_comp != null and pos_comp.facing != Vector2i.ZERO:
+		strike_dir = Vector2(pos_comp.facing)
+
+	var params = _CreatureKinematics.build_attack_impact_params(
+		reg,
+		creature_eid,
+		creature,
+		body,
+		traits,
+		attack_cfg,
+		strike_dir,
+		target_velocity
+	)
+
+	var event = _ImpactEventComponent.new()
+	event.target_eid = target_eid
+	event.params = params
+	event.remove_on_resolve = true
+	reg.add(striker_eid, event)
+
+	var cost: float = attack_cfg.get("stamina_cost", 0.15) as float
+	creature.stamina = maxf(0.05, creature.stamina - cost)
+	if pos_comp != null:
+		pos_comp.move_cooldown_ticks = maxi(2, pos_comp.base_move_interval + 1)
+
+	if world.signals != null and pos_comp != null:
+		world.signals.emit_sound(pos_comp.position, 0.35, 2)
+
+	return event
+
+func _execute_attack(
+	creature_eid: int,
+	pos_comp: _PositionComponent,
+	creature: _CreatureComponent,
+	_mind: _MindComponent,
+	plan: _ActionPlanComponent,
+	_traits: _TraitComponent,
+	_tick_number: int
+) -> void:
+	var target_pos: Vector2i = plan.target_tile
+	if target_pos == Vector2i(-1, -1) or not world.is_valid_position(target_pos):
+		plan.clear_path()
+		return
+
+	var strike_dir: Vector2i = target_pos - pos_comp.position
+	if strike_dir != Vector2i.ZERO:
+		pos_comp.facing = strike_dir
+
+	var reg = world.get_registry()
+	var effective_target_eid: int = -1
+
+	# Check for creature entity at target tile first
+	var pos_store: Dictionary = reg.get_store(&"PositionComponent")
+	var creature_store: Dictionary = reg.get_store(&"CreatureComponent")
+	for other_eid: int in creature_store:
+		if other_eid == creature_eid:
+			continue
+		var other_pos = pos_store.get(other_eid, null)
+		if other_pos != null and other_pos.position == target_pos:
+			effective_target_eid = other_eid
+			break
+
+	# Fallback to terrain tile entity
+	if effective_target_eid == -1:
+		effective_target_eid = world.get_entity_at(target_pos)
+
+	if effective_target_eid == -1:
+		plan.clear_path()
+		return
+
+	var event = queue_creature_impact(creature_eid, effective_target_eid)
+	if event != null:
+		plan.clear_path()
+		world.mark_render_dirty()
+		print("[Creature] %s (eid=%d) queued impact against target_eid=%d (E=%.1f J, form=%d)." % [
+			creature.creature_name, creature_eid, effective_target_eid, event.params.kinetic_energy, event.params.form
+		])
+	else:
+		plan.clear_path()
+
 

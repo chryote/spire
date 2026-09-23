@@ -7,6 +7,8 @@ extends RefCounted
 
 const _MaterialTypes = preload("res://modules/matter/data/MaterialTypes.gd")
 const _TraitTypes    = preload("res://modules/creature/data/TraitTypes.gd")
+const _ImpactTypes   = preload("res://modules/matter/data/ImpactTypes.gd")
+
 
 enum Type {
 	GRAZER = 0,
@@ -81,6 +83,28 @@ const DATA: Dictionary = {
 				"stomach": { "volume": 0.0010, "matter": _MaterialTypes.Type.RAW_MEAT, "vital": false },
 				"brain":   { "volume": 0.0003, "matter": _MaterialTypes.Type.RAW_MEAT, "vital": true },
 			}
+		},
+		"natural_attacks": {
+			"headbutt": {
+				"limb":              "head",
+				"form":              _ImpactTypes.Form.BLUNT,
+				"contact_area":      0.008,
+				"mass_ratio":        0.60,
+				"velocity_mult":     1.2,
+				"sharpness":         0.8,
+				"stamina_cost":      0.15,
+				"striking_material": _MaterialTypes.Type.BONE,
+			},
+			"kick": {
+				"limb":              "right_hindleg",
+				"form":              _ImpactTypes.Form.BLUNT,
+				"contact_area":      0.005,
+				"mass_ratio":        0.20,
+				"velocity_mult":     1.5,
+				"sharpness":         0.8,
+				"stamina_cost":      0.10,
+				"striking_material": _MaterialTypes.Type.BONE,
+			},
 		}
 	},
 	Type.HARE: {
@@ -143,6 +167,28 @@ const DATA: Dictionary = {
 				"stomach": { "volume": 0.0003, "matter": _MaterialTypes.Type.RAW_MEAT, "vital": false },
 				"brain":   { "volume": 0.0001, "matter": _MaterialTypes.Type.RAW_MEAT, "vital": true },
 			}
+		},
+		"natural_attacks": {
+			"scratch": {
+				"limb":              "left_foreleg",
+				"form":              _ImpactTypes.Form.SLASH,
+				"contact_area":      0.0001,
+				"mass_ratio":        0.02,
+				"velocity_mult":     2.2,
+				"sharpness":         1.8,
+				"stamina_cost":      0.05,
+				"striking_material": _MaterialTypes.Type.BONE,
+			},
+			"kick": {
+				"limb":              "right_hindleg",
+				"form":              _ImpactTypes.Form.BLUNT,
+				"contact_area":      0.001,
+				"mass_ratio":        0.20,
+				"velocity_mult":     1.8,
+				"sharpness":         0.6,
+				"stamina_cost":      0.08,
+				"striking_material": _MaterialTypes.Type.BONE,
+			},
 		}
 	},
 	Type.DEER: {
@@ -205,6 +251,28 @@ const DATA: Dictionary = {
 				"stomach": { "volume": 0.0030, "matter": _MaterialTypes.Type.RAW_MEAT, "vital": false },
 				"brain":   { "volume": 0.0008, "matter": _MaterialTypes.Type.RAW_MEAT, "vital": true },
 			}
+		},
+		"natural_attacks": {
+			"antler_gore": {
+				"limb":              "head",
+				"form":              _ImpactTypes.Form.PIERCE,
+				"contact_area":      0.00005,
+				"mass_ratio":        0.85,
+				"velocity_mult":     1.6,
+				"sharpness":         1.6,
+				"stamina_cost":      0.20,
+				"striking_material": _MaterialTypes.Type.BONE,
+			},
+			"trample": {
+				"limb":              "left_foreleg",
+				"form":              _ImpactTypes.Form.CRUSH,
+				"contact_area":      0.010,
+				"mass_ratio":        0.70,
+				"velocity_mult":     1.2,
+				"sharpness":         0.7,
+				"stamina_cost":      0.15,
+				"striking_material": _MaterialTypes.Type.BONE,
+			},
 		}
 	}
 }
@@ -215,6 +283,14 @@ static func get_data(species_type: int) -> Dictionary:
 static func get_growth_profile(species_type: int) -> Dictionary:
 	var d: Dictionary = get_data(species_type)
 	return d.get("growth_profile", {})
+
+static func get_natural_attacks(species_type: int) -> Dictionary:
+	var d: Dictionary = get_data(species_type)
+	return d.get("natural_attacks", {})
+
+static func get_natural_attack(species_type: int, attack_name: String) -> Dictionary:
+	var attacks: Dictionary = get_natural_attacks(species_type)
+	return attacks.get(attack_name, {})
 
 static func get_stage_name(stage: int) -> String:
 	match stage:
