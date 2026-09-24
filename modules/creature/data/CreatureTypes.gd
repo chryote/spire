@@ -8,6 +8,7 @@ extends RefCounted
 const _MaterialTypes = preload("res://modules/matter/data/MaterialTypes.gd")
 const _TraitTypes    = preload("res://modules/creature/data/TraitTypes.gd")
 const _ImpactTypes   = preload("res://modules/matter/data/ImpactTypes.gd")
+const _DietTypes     = preload("res://modules/matter/data/DietTypes.gd")
 
 
 enum Type {
@@ -35,6 +36,7 @@ const DATA: Dictionary = {
 		"sight_radius":      10,         # tiles
 		"stomach_capacity":  50.0,       # nutrition points
 		"blood_volume":      2.2,        # liters
+		"diet":              _DietTypes.Category.HERBIVORE,
 		"graze_amount":      1,          # growth stages or grass items per bite
 		"graze_satiation":   0.25,       # hunger reduction per bite (0.0 to 1.0)
 		"innate_traits":     [ _TraitTypes.Type.HARDY ],
@@ -119,6 +121,7 @@ const DATA: Dictionary = {
 		"sight_radius":      8,
 		"stomach_capacity":  20.0,
 		"blood_volume":      0.5,
+		"diet":              _DietTypes.Category.HERBIVORE,
 		"graze_amount":      1,
 		"graze_satiation":   0.35,
 		"innate_traits":     [ _TraitTypes.Type.TIMID, _TraitTypes.Type.FLEET_FOOTED ],
@@ -203,6 +206,7 @@ const DATA: Dictionary = {
 		"sight_radius":      12,
 		"stomach_capacity":  120.0,
 		"blood_volume":      5.5,
+		"diet":              _DietTypes.Category.HERBIVORE,
 		"graze_amount":      1,
 		"graze_satiation":   0.20,
 		"innate_traits":     [ _TraitTypes.Type.CURIOUS, _TraitTypes.Type.FLEET_FOOTED ],

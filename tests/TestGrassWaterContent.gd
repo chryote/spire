@@ -12,6 +12,7 @@ const _CreatureFactory    = preload("res://modules/creature/systems/CreatureFact
 const _CreatureTypes      = preload("res://modules/creature/data/CreatureTypes.gd")
 const _MindComponent      = preload("res://modules/creature/components/mind/MindComponent.gd")
 const _PositionComponent  = preload("res://modules/creature/components/PositionComponent.gd")
+const _TraitComponent     = preload("res://modules/creature/components/TraitComponent.gd")
 
 func _ready() -> void:
 	print("\n=== STARTING GRASS WATER MATERIAL & CREATURE HYDRATION TESTS ===")
@@ -159,7 +160,9 @@ func _test_creature_graze_quenches_thirst_with_fresh_grass() -> void:
 	assert(mind.thirst < initial_thirst - 0.15, "Thirst must decrease after grazing fresh grass with water (was: %.2f, now: %.2f)" % [
 		initial_thirst, mind.thirst
 	])
-	assert(is_equal_approx(mind.thirst, initial_thirst + 0.003 - 0.20), "Thirst reduction should equal 0.20 (net of 0.003 metabolic tick)")
+	var traits_comp: _TraitComponent = reg.get_component(creature_eid, &"TraitComponent")
+	var t_rate: float = 0.003 * (traits_comp.get_stat_multiplier(&"thirst_mult", 1.0) if traits_comp != null else 1.0)
+	assert(is_equal_approx(mind.thirst, initial_thirst + t_rate - 0.20), "Thirst reduction should equal 0.20 (net of metabolic tick)")
 	print("  -> PASSED: Creature successfully quenched hunger AND thirst from fresh grass holding water material.")
 
 func _test_creature_graze_dry_grass_no_thirst_quench() -> void:

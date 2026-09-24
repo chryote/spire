@@ -103,11 +103,11 @@ func _test_trait_behavior_utility_weighting() -> void:
 
 	World._run_tick()
 
-	var normal_graze_u: float  = normal_mind.action_utilities.get(_MindEmbeddings.Action.GRAZE, 0.0)
-	var glutton_graze_u: float = glutton_mind.action_utilities.get(_MindEmbeddings.Action.GRAZE, 0.0)
+	var normal_eat_u: float  = normal_mind.action_utilities.get(_MindEmbeddings.Action.EAT, 0.0)
+	var glutton_eat_u: float = glutton_mind.action_utilities.get(_MindEmbeddings.Action.EAT, 0.0)
 
-	print("  Glutton Graze Utility: %.2f | Normal Graze Utility: %.2f" % [glutton_graze_u, normal_graze_u])
-	assert(glutton_graze_u > normal_graze_u, "Gluttonous creature must evaluate GRAZE utility higher than normal creature")
+	print("  Glutton Eat Utility: %.2f | Normal Eat Utility: %.2f" % [glutton_eat_u, normal_eat_u])
+	assert(glutton_eat_u > normal_eat_u, "Gluttonous creature must evaluate EAT utility higher than normal creature")
 
 	print("  -> PASSED: Trait-weighted Utility AI decisions verified.")
 

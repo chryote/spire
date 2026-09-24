@@ -14,6 +14,9 @@ extends Resource
 ## Tracks the MaterialTypes.Type int currently loaded (-1 = unset).
 var material_id: int = -1
 
+## Tracks the DietTypes.Category int (0=NONE, 1=HERBIVORE, 2=OMNIVORE, 3=CARNIVORE).
+var diet_category: int = 0
+
 # ---------------------------------------------------------------------------
 # Physical
 # ---------------------------------------------------------------------------

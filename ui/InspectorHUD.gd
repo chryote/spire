@@ -22,6 +22,7 @@ const _PositionComponent   = preload("res://modules/creature/components/Position
 const _BodyComponent       = preload("res://modules/creature/components/body/BodyComponent.gd")
 const _MindComponent       = preload("res://modules/creature/components/mind/MindComponent.gd")
 const _ActionPlanComponent = preload("res://modules/creature/components/mind/ActionPlanComponent.gd")
+const _DietTypes           = preload("res://modules/matter/data/DietTypes.gd")
 const _TileComponent       = preload("res://modules/terrain/components/TileComponent.gd")
 const _BiomeComponent      = preload("res://modules/terrain/components/BiomeComponent.gd")
 const _MatterComponent     = preload("res://modules/matter/components/MatterComponent.gd")
@@ -549,8 +550,9 @@ func _render_creature(reg, ceid: int) -> void:
 		stage_str = " [%s, %d%% Scale]" % [s_name, scale_pct]
 
 	if creature_header_label != null:
-		creature_header_label.text = "%s \"%s\" (eid=%d)%s — %s (Age: %d)" % [
-			species_name, creature.creature_name, ceid, stage_str, status_str, creature.age_ticks
+		var diet_name: String = _DietTypes.get_category_name(creature.diet)
+		creature_header_label.text = "%s \"%s\" (eid=%d)%s [%s] — %s (Age: %d)" % [
+			species_name, creature.creature_name, ceid, stage_str, diet_name, status_str, creature.age_ticks
 		]
 
 	# --- Thought & Action ---
@@ -563,12 +565,12 @@ func _render_creature(reg, ceid: int) -> void:
 
 	if plan != null:
 		match plan.current_goal:
-			_MindEmbeddings.Action.GRAZE:
-				act_name = "GRAZE"
+			_MindEmbeddings.Action.EAT:
+				act_name = "EAT"
 				if plan.target_tile == selected_tile or plan.path_queue.is_empty():
-					thought_text = "Grazing on local vegetation to satiate hunger."
+					thought_text = "Consuming compatible food to satiate hunger."
 				else:
-					thought_text = "Seeking edible pasture at %s (hunger drive: %.0f%%)." % [
+					thought_text = "Seeking food at %s (hunger drive: %.0f%%)." % [
 						plan.target_tile, mind.hunger * 100.0 if mind != null else 50.0
 					]
 			_MindEmbeddings.Action.DRINK:
@@ -614,7 +616,7 @@ func _render_creature(reg, ceid: int) -> void:
 	if creature_utilities_label != null and mind != null and not mind.action_utilities.is_empty():
 		var util_parts: Array[String] = []
 		for act: int in [
-			_MindEmbeddings.Action.GRAZE,
+			_MindEmbeddings.Action.EAT,
 			_MindEmbeddings.Action.DRINK,
 			_MindEmbeddings.Action.FLEE,
 			_MindEmbeddings.Action.REST,

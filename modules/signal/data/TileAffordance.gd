@@ -20,7 +20,9 @@ enum {
 	## Clean, uncontaminated water source suitable for drinking.
 	DRINKABLE       = 1 << 4,
 
-	## Living plant matter edible by grazing herbivores (grass, shrubs, flowers).
+	## Living plant matter or vegetation items edible by herbivores (grass, shrubs, flowers).
+	HERBIVORE_FOOD  = 1 << 5,
+	## Backward-compatible alias for HERBIVORE_FOOD
 	GRAZEABLE       = 1 << 5,
 
 	## Raw meat, carcasses, or food items on the ground edible by carnivores/scavengers.
@@ -41,7 +43,7 @@ static func mask_to_string(mask: int) -> String:
 	if mask & HAZARD_LETHAL:  active.append("HAZARD_LETHAL")
 	if mask & HAZARD_SLOW:    active.append("HAZARD_SLOW")
 	if mask & DRINKABLE:      active.append("DRINKABLE")
-	if mask & GRAZEABLE:      active.append("GRAZEABLE")
+	if mask & HERBIVORE_FOOD: active.append("HERBIVORE_FOOD")
 	if mask & CARNIVORE_FOOD: active.append("CARNIVORE_FOOD")
 	if mask & COVER:          active.append("COVER")
 	if mask & SHELTER:        active.append("SHELTER")

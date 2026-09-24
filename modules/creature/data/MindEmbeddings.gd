@@ -6,6 +6,8 @@
 class_name MindEmbeddings
 extends RefCounted
 
+const _DietTypes = preload("res://modules/matter/data/DietTypes.gd")
+
 const DIMENSIONS: int = 8
 
 enum Drive {
@@ -21,7 +23,7 @@ enum Drive {
 
 enum Action {
 	IDLE   = 0,
-	GRAZE  = 1,
+	EAT    = 1,
 	DRINK  = 2,
 	FLEE   = 3,
 	REST   = 4,
@@ -29,10 +31,13 @@ enum Action {
 	ATTACK = 6,
 }
 
+## Backward-compatible alias for Action.EAT
+const GRAZE: int = Action.EAT
+
 ## Action prototype vectors in R^8 representing optimal drive alignment.
 ## [HUNGER, THIRST, FEAR, FATIGUE, CURIOSITY, PAIN, COMFORT, SOCIABILITY]
 const ACTION_PROTOTYPES: Dictionary = {
-	Action.GRAZE:  [1.00, 0.10, 0.00, 0.00, 0.10, 0.00, 0.10, 0.00],
+	Action.EAT:    [1.00, 0.10, 0.00, 0.00, 0.10, 0.00, 0.10, 0.00],
 	Action.DRINK:  [0.10, 1.00, 0.00, 0.00, 0.10, 0.00, 0.10, 0.00],
 	Action.FLEE:   [0.00, 0.00, 1.00, 0.00, 0.00, 0.80, 0.00, 0.00],
 	Action.REST:   [0.05, 0.05, 0.00, 1.00, 0.00, 0.20, 0.50, 0.00],
@@ -76,7 +81,8 @@ static func cosine_similarity(a: PackedFloat32Array, b: PackedFloat32Array) -> f
 static func evaluate_utility(
 	drives: PackedFloat32Array,
 	perception: Dictionary,
-	action: int
+	action: int,
+	creature_diet: int = 1
 ) -> float:
 	var raw_proto = ACTION_PROTOTYPES.get(action, null)
 	if raw_proto == null:
@@ -99,8 +105,20 @@ static func evaluate_utility(
 				return clampf(fear * 1.5 + hazard * 1.5, 0.0, 1.0)
 			return 0.0
 
-		Action.GRAZE:
-			var food_avail: float = perception.get(&"food_plant", 0.0) as float
+		Action.EAT:
+			var food_avail: float = 0.0
+			match creature_diet:
+				_DietTypes.Category.HERBIVORE:
+					food_avail = perception.get(&"food_plant", 0.0) as float
+				_DietTypes.Category.CARNIVORE:
+					food_avail = perception.get(&"food_meat", 0.0) as float
+				_DietTypes.Category.OMNIVORE:
+					var p_val: float = perception.get(&"food_plant", 0.0) as float
+					var m_val: float = perception.get(&"food_meat", 0.0) as float
+					food_avail = maxf(p_val, m_val)
+				_:
+					food_avail = perception.get(&"food_plant", 0.0) as float
+
 			var hunger: float     = drives[Drive.HUNGER]
 			var thirst: float     = drives[Drive.THIRST] if drives.size() > Drive.THIRST else 0.0
 			var hunger_curve: float = pow(hunger, 1.3)

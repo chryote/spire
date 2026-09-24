@@ -43,6 +43,7 @@ const _TraitSystem              = preload("res://modules/creature/systems/TraitS
 const _CreatureBodySystem       = preload("res://modules/creature/systems/CreatureBodySystem.gd")
 const _CreatureAISystem         = preload("res://modules/creature/systems/CreatureAISystem.gd")
 const _CreatureLocomotionSystem = preload("res://modules/creature/systems/CreatureLocomotionSystem.gd")
+const _CreatureAbilitySystem    = preload("res://modules/creature/systems/CreatureAbilitySystem.gd")
 
 # ---------------------------------------------------------------------------
 # Map constants
@@ -141,6 +142,7 @@ var _sim_systems: Array = []
 var impact_solver = null
 var signals = null
 var creature_locomotion = null
+var creature_abilities = null
 
 # ---------------------------------------------------------------------------
 # Signals
@@ -315,13 +317,15 @@ func _register_modules() -> void:
 	signals = _SignalSystem.new()
 	_add_system(signals, 220)
 
-	# --- Creature module (priorities 223, 224, 225, 230, 235) ---
+	# --- Creature module (priorities 223, 224, 225, 230, 235, 240) ---
 	_add_system(_CreatureGrowthSystem.new(), 223)
 	_add_system(_TraitSystem.new(), 224)
 	_add_system(_CreatureBodySystem.new(), 225)
 	_add_system(_CreatureAISystem.new(), 230)
 	creature_locomotion = _CreatureLocomotionSystem.new()
 	_add_system(creature_locomotion, 235)
+	creature_abilities = _CreatureAbilitySystem.new()
+	_add_system(creature_abilities, 240)
 
 	# Sort ascending by priority so lower numbers execute first
 	_sim_systems.sort_custom(func(a, b) -> bool: return a.priority < b.priority)

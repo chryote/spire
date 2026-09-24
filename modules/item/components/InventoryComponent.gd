@@ -18,7 +18,9 @@ var capacity: int = -1
 # Cached Summary Flags for Spatial Perception / Signal System
 # (Updated on item add/remove, NOT recomputed on every tick!)
 # ---------------------------------------------------------------------------
+var has_herbivore_food: bool = false
 var has_carnivore_food: bool = false
+var has_omnivore_food: bool = false
 var max_calories: int = 0
 var has_blood_scent: bool = false
 
@@ -67,7 +69,9 @@ func remove_item(item_entity_id: int) -> bool:
 func clear_items() -> Array[int]:
 	var old_items: Array[int] = items.duplicate()
 	items.clear()
+	has_herbivore_food = false
 	has_carnivore_food = false
+	has_omnivore_food = false
 	max_calories = 0
 	has_blood_scent = false
 	if container_id != -1:
@@ -78,22 +82,33 @@ func clear_items() -> Array[int]:
 
 ## Recalculates cached spatial perception flags for this inventory.
 func update_cache(reg) -> void:
+	has_herbivore_food = false
 	has_carnivore_food = false
+	has_omnivore_food = false
 	max_calories = 0
 	has_blood_scent = false
 	if reg == null or items.is_empty():
 		return
 
 	var mat_types = preload("res://modules/matter/data/MaterialTypes.gd")
+	var diet_types = preload("res://modules/matter/data/DietTypes.gd")
 	for item_id: int in items:
 		var item = reg.get_component(item_id, &"ItemComponent")
 		if item == null:
 			continue
 		var mat_data: Dictionary = mat_types.get_data(item.material_type)
 		var cal: int = mat_data.get("nutritional_value", 0) as int
-		if cal > 0:
-			has_carnivore_food = true
-			if cal > max_calories:
-				max_calories = cal
+		if cal > 0 and cal > max_calories:
+			max_calories = cal
+
+		var diet_cat: int = mat_data.get("diet_category", diet_types.Category.NONE) as int
+		match diet_cat:
+			diet_types.Category.HERBIVORE:
+				has_herbivore_food = true
+			diet_types.Category.CARNIVORE:
+				has_carnivore_food = true
+			diet_types.Category.OMNIVORE:
+				has_omnivore_food = true
+
 		if item.material_type == mat_types.Type.RAW_MEAT:
 			has_blood_scent = true

@@ -6,6 +6,9 @@ extends Resource
 ## Species archetype from CreatureTypes.Type.
 var species_type: int = 0
 
+## Diet category from DietTypes.Category (1=HERBIVORE, 2=OMNIVORE, 3=CARNIVORE).
+var diet: int = 1
+
 ## Human-readable individual name.
 var creature_name: String = "Creature"
 

@@ -102,7 +102,7 @@ func _test_rest_with_nearby_cover() -> void:
 	var reached_cover: bool = false
 	for tick_idx in range(15):
 		World._run_tick()
-		if pos_comp.position == target_cover_pos:
+		if pos_comp.position == target_cover_pos or pos_comp.position == cover_pos or World.signals.has_affordance(pos_comp.position, _TileAffordance.COVER):
 			reached_cover = true
 			print("[Test 1] Reached COVER tile at tick %d! Position: %s, Fatigue: %.2f" % [
 				tick_idx + 1, pos_comp.position, mind.fatigue

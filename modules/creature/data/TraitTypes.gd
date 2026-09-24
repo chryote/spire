@@ -72,7 +72,7 @@ const DATA: Dictionary = {
 		"category": Category.GENETIC,
 		"color": Color(0.55, 0.90, 0.55, 1.0),
 		"action_weights": {
-			_MindEmbeddings.Action.GRAZE: { "add": 0.30, "mult": 1.35 },
+			_MindEmbeddings.Action.EAT: { "add": 0.30, "mult": 1.35 },
 		},
 		"stat_modifiers": {
 			"metabolism_mult": 1.35,
@@ -173,7 +173,7 @@ const DATA: Dictionary = {
 		"category": Category.BUFF,
 		"color": Color(0.40, 0.90, 0.40, 1.0),
 		"action_weights": {
-			_MindEmbeddings.Action.GRAZE: { "add": -0.25, "mult": 0.50 },
+			_MindEmbeddings.Action.EAT: { "add": -0.25, "mult": 0.50 },
 		},
 		"stat_modifiers": {
 			"metabolism_mult": 0.60,
@@ -225,7 +225,7 @@ const DATA: Dictionary = {
 		"category": Category.DEBUFF,
 		"color": Color(0.95, 0.45, 0.20, 1.0),
 		"action_weights": {
-			_MindEmbeddings.Action.GRAZE:  { "add": 0.50, "mult": 1.60 },
+			_MindEmbeddings.Action.EAT:    { "add": 0.50, "mult": 1.60 },
 			_MindEmbeddings.Action.WANDER: { "add": -0.30, "mult": 0.30 },
 		},
 		"stat_modifiers": {
@@ -266,7 +266,7 @@ const DATA: Dictionary = {
 		"color": Color(1.0, 0.20, 0.50, 1.0),
 		"action_weights": {
 			_MindEmbeddings.Action.FLEE:   { "add": 0.60, "mult": 2.00 },
-			_MindEmbeddings.Action.GRAZE:  { "add": -0.80, "mult": 0.00 },
+			_MindEmbeddings.Action.EAT:    { "add": -0.80, "mult": 0.00 },
 			_MindEmbeddings.Action.DRINK:  { "add": -0.80, "mult": 0.00 },
 			_MindEmbeddings.Action.REST:   { "add": -0.80, "mult": 0.00 },
 		},

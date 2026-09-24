@@ -26,6 +26,8 @@
 class_name MaterialTypes
 extends RefCounted
 
+const _DietTypes = preload("res://modules/matter/data/DietTypes.gd")
+
 enum Type {
 	STONE          = 0,
 	GROUND         = 1,
@@ -109,6 +111,7 @@ const DATA: Dictionary = {
 		"moisture": 0.40, "rot_rate": 0.15, "toxicity": 0.0,
 		"hardness": 1.0, "yield_strength": 5.0, "elasticity": 0.7,
 		"nutritional_value": 2,
+		"diet_category": _DietTypes.Category.HERBIVORE,
 	},
 	Type.DIRT: {
 		"display_name": "Dirt",
@@ -142,6 +145,7 @@ const DATA: Dictionary = {
 		"moisture": 0.30, "rot_rate": 0.40, "toxicity": 0.0,
 		"hardness": 0.5, "yield_strength": 4.0, "elasticity": 0.6,
 		"nutritional_value": 1,
+		"diet_category": _DietTypes.Category.HERBIVORE,
 	},
 	Type.WOOD_SOFT: {  ## shrubs, wildflowers
 		"display_name": "Soft Wood",
@@ -215,6 +219,7 @@ const DATA: Dictionary = {
 		"moisture": 0.75, "rot_rate": 0.50, "toxicity": 0.2,
 		"hardness": 1.5, "yield_strength": 2.0, "elasticity": 0.8,
 		"nutritional_value": 250,
+		"diet_category": _DietTypes.Category.CARNIVORE,
 	},
 	Type.SPIDER_SILK: {
 		"display_name": "Spider Silk",
@@ -295,6 +300,7 @@ const DATA: Dictionary = {
 		"moisture": 0.55, "rot_rate": 0.7, "toxicity": 0.0,
 		"hardness": 0.5, "yield_strength": 3.0, "elasticity": 0.7,
 		"nutritional_value": 8,
+		"diet_category": _DietTypes.Category.HERBIVORE,
 	},
 	Type.BONE: {
 		"display_name": "Bone",
@@ -305,6 +311,7 @@ const DATA: Dictionary = {
 		"moisture": 0.10, "rot_rate": 0.05, "toxicity": 0.0,
 		"hardness": 5.0, "yield_strength": 130.0, "elasticity": 0.15,
 		"nutritional_value": 50,
+		"diet_category": _DietTypes.Category.CARNIVORE,
 	},
 	Type.ANIMAL_BLOOD: {
 		"display_name": "Animal Blood",
@@ -315,6 +322,7 @@ const DATA: Dictionary = {
 		"moisture": 0.82, "rot_rate": 0.80, "toxicity": 0.05,
 		"hardness": 0.0, "yield_strength": 0.0, "elasticity": 0.0,
 		"nutritional_value": 120,
+		"diet_category": _DietTypes.Category.CARNIVORE,
 	},
 }
 
@@ -344,4 +352,9 @@ static func apply_to(matter, material_type: int) -> void:
 	matter.hardness        = d.get("hardness",        5.0) as float
 	matter.yield_strength  = d.get("yield_strength",  100.0) as float
 	matter.elasticity      = d.get("elasticity",      0.3) as float
+	matter.diet_category   = d.get("diet_category",   _DietTypes.Category.NONE) as int
+
+static func get_diet_category(material_type: int) -> int:
+	return get_data(material_type).get("diet_category", _DietTypes.Category.NONE) as int
+
 

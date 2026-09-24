@@ -18,6 +18,7 @@ const _MindEmbeddings      = preload("res://modules/creature/data/MindEmbeddings
 const _TraitComponent      = preload("res://modules/creature/components/TraitComponent.gd")
 const _SignalTypes         = preload("res://modules/signal/data/SignalTypes.gd")
 const _TileAffordance      = preload("res://modules/signal/data/TileAffordance.gd")
+const _DietTypes           = preload("res://modules/matter/data/DietTypes.gd")
 
 func initialize() -> void:
 	print("[CreatureAISystem] Initialized. Priority 230.")
@@ -76,13 +77,13 @@ func tick(tick_number: int) -> void:
 		for act: int in [
 			_MindEmbeddings.Action.FLEE,
 			_MindEmbeddings.Action.ATTACK,
-			_MindEmbeddings.Action.GRAZE,
+			_MindEmbeddings.Action.EAT,
 			_MindEmbeddings.Action.DRINK,
 			_MindEmbeddings.Action.REST,
 			_MindEmbeddings.Action.WANDER,
 			_MindEmbeddings.Action.IDLE
 		]:
-			var u: float = _MindEmbeddings.evaluate_utility(mind.drives, sig_data, act)
+			var u: float = _MindEmbeddings.evaluate_utility(mind.drives, sig_data, act, creature.diet)
 			if traits != null:
 				u = traits.apply_action_weight(act, u)
 			mind.action_utilities[act] = u
@@ -97,8 +98,8 @@ func tick(tick_number: int) -> void:
 		# 3. Action Planning & Path Selection
 		# -------------------------------------------------------------------
 		match best_action:
-			_MindEmbeddings.Action.GRAZE:
-				_plan_graze(cur_pos, plan, mem, tick_number)
+			_MindEmbeddings.Action.EAT:
+				_plan_eat(cur_pos, plan, creature, mem, tick_number)
 
 			_MindEmbeddings.Action.DRINK:
 				_plan_drink(cur_pos, plan, pos_comp, mem, tick_number)
@@ -229,18 +230,40 @@ func _find_approach_for_water(water_pos: Vector2i, from_pos: Vector2i) -> Vector
 	return best_approach
 
 
-func _plan_graze(cur_pos: Vector2i, plan: _ActionPlanComponent, mem: _MemoryComponent, tick_number: int) -> void:
-	# If current tile has edible grass, stay and graze!
-	if world.signals.has_affordance(cur_pos, _TileAffordance.GRAZEABLE):
+func _has_compatible_food(pos: Vector2i, diet: int) -> bool:
+	match diet:
+		_DietTypes.Category.HERBIVORE:
+			return world.signals.has_affordance(pos, _TileAffordance.HERBIVORE_FOOD)
+		_DietTypes.Category.CARNIVORE:
+			return world.signals.has_affordance(pos, _TileAffordance.CARNIVORE_FOOD)
+		_DietTypes.Category.OMNIVORE:
+			return world.signals.has_affordance(pos, _TileAffordance.HERBIVORE_FOOD) or world.signals.has_affordance(pos, _TileAffordance.CARNIVORE_FOOD)
+		_:
+			return world.signals.has_affordance(pos, _TileAffordance.HERBIVORE_FOOD)
+
+func _get_compatible_food_signal(pos: Vector2i, diet: int) -> float:
+	match diet:
+		_DietTypes.Category.HERBIVORE:
+			return world.signals.get_signal(_SignalTypes.FOOD_PLANT, pos)
+		_DietTypes.Category.CARNIVORE:
+			return world.signals.get_signal(_SignalTypes.FOOD_MEAT, pos)
+		_DietTypes.Category.OMNIVORE:
+			return maxf(world.signals.get_signal(_SignalTypes.FOOD_PLANT, pos), world.signals.get_signal(_SignalTypes.FOOD_MEAT, pos))
+		_:
+			return world.signals.get_signal(_SignalTypes.FOOD_PLANT, pos)
+
+func _plan_eat(cur_pos: Vector2i, plan: _ActionPlanComponent, creature: _CreatureComponent, mem: _MemoryComponent, tick_number: int) -> void:
+	# If current tile has compatible food, stay and eat!
+	if _has_compatible_food(cur_pos, creature.diet):
 		plan.clear_path()
 		plan.target_tile = cur_pos
 		return
 
-	# If already en-route to a valid grazeable target, keep following path
-	if not plan.path_queue.is_empty() and world.signals.has_affordance(plan.target_tile, _TileAffordance.GRAZEABLE):
+	# If already en-route to a valid food target, keep following path
+	if not plan.path_queue.is_empty() and _has_compatible_food(plan.target_tile, creature.diet):
 		return
 
-	# Search local area (radius 8) for the best grazeable tile
+	# Search local area (radius 8) for the best compatible food tile
 	var best_tile := Vector2i(-1, -1)
 	var best_score: float = -999.0
 
@@ -251,13 +274,13 @@ func _plan_graze(cur_pos: Vector2i, plan: _ActionPlanComponent, mem: _MemoryComp
 				continue
 			if not world.signals.has_affordance(candidate, _TileAffordance.WALKABLE):
 				continue
-			if not world.signals.has_affordance(candidate, _TileAffordance.GRAZEABLE):
+			if not _has_compatible_food(candidate, creature.diet):
 				continue
 
 			var dist: float = cur_pos.distance_to(candidate)
-			var food_val: float = world.signals.get_signal(_SignalTypes.FOOD_PLANT, candidate)
+			var food_val: float = _get_compatible_food_signal(candidate, creature.diet)
 
-			# Penalize recently visited/grazed tiles to prevent looping
+			# Penalize recently visited/eaten tiles to prevent looping
 			var recency_penalty: float = 0.0
 			if mem != null and mem.was_recently_at(candidate, 30, tick_number):
 				recency_penalty = 0.5
@@ -267,9 +290,11 @@ func _plan_graze(cur_pos: Vector2i, plan: _ActionPlanComponent, mem: _MemoryComp
 				best_score = score
 				best_tile = candidate
 
+	var landmark: StringName = &"carrion" if creature.diet == _DietTypes.Category.CARNIVORE else &"pasture"
+
 	# Check long-term memory if no food found in immediate view
 	if best_tile == Vector2i(-1, -1) and mem != null:
-		var remembered_pos := mem.get_closest_landmark(&"pasture", cur_pos)
+		var remembered_pos := mem.get_closest_landmark(landmark, cur_pos)
 		if remembered_pos != Vector2i(-1, -1) and world.is_valid_position(remembered_pos):
 			best_tile = remembered_pos
 
@@ -277,7 +302,7 @@ func _plan_graze(cur_pos: Vector2i, plan: _ActionPlanComponent, mem: _MemoryComp
 		plan.target_tile = best_tile
 		plan.path_queue = _build_simple_path(cur_pos, best_tile)
 		if mem != null:
-			mem.remember_landmark(best_tile, &"pasture", 1.0, tick_number)
+			mem.remember_landmark(best_tile, landmark, 1.0, tick_number)
 
 func _plan_flee(cur_pos: Vector2i, plan: _ActionPlanComponent) -> void:
 	var grad: Vector2 = world.signals.get_gradient(_SignalTypes.HAZARD, cur_pos)

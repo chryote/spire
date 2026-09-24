@@ -163,8 +163,8 @@ func _test_creature_lifecycle_and_graze() -> void:
 	World._run_tick()
 
 	print("[Test] Evaluated Action Utilities: %s" % [mind.action_utilities])
-	print("[Test] Selected Goal: %d (GRAZE=%d)" % [mind.current_action, _MindEmbeddings.Action.GRAZE])
-	assert(mind.current_action == _MindEmbeddings.Action.GRAZE, "Utility AI must select GRAZE when hungry near grass")
+	print("[Test] Selected Goal: %d (EAT=%d)" % [mind.current_action, _MindEmbeddings.Action.EAT])
+	assert(mind.current_action == _MindEmbeddings.Action.EAT, "Utility AI must select EAT when hungry near grass")
 
 	# -----------------------------------------------------------------------
 	# 5. Simulate Locomotion towards Grass & Grazing

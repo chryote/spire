@@ -600,10 +600,10 @@ func _sample_inventory_items(reg) -> void:
 			continue
 
 		# Lazy cache initialization if directly populated
-		if not inv.has_carnivore_food and not inv.has_blood_scent and inv.max_calories == 0:
+		if not inv.has_carnivore_food and not inv.has_herbivore_food and not inv.has_omnivore_food and not inv.has_blood_scent and inv.max_calories == 0:
 			inv.update_cache(reg)
 
-		if not inv.has_carnivore_food and not inv.has_blood_scent:
+		if not inv.has_carnivore_food and not inv.has_herbivore_food and not inv.has_omnivore_food and not inv.has_blood_scent:
 			continue
 
 		var tile = tile_store.get(container_id, null)
@@ -611,16 +611,17 @@ func _sample_inventory_items(reg) -> void:
 			continue
 		var idx: int = tile.position.y * _width + tile.position.x
 
-		if inv.has_carnivore_food and inv.max_calories > 0:
+		if (inv.has_carnivore_food or inv.has_omnivore_food) and inv.max_calories > 0:
 			meat_food_grid.data[idx] = clampf(float(inv.max_calories) / 1000.0, 0.1, 1.0)
 			affordance_map[idx] |= _TileAffordance.CARNIVORE_FOOD
 
-		# Loose grass items in tile inventory (yielded from plants or dropped)
-		var grass_qty: int = inv.get_total_quantity_of_type(reg, _ItemTypes.Type.GRASS)
-		if grass_qty > 0:
+		# Loose plant / herbivore food items in tile inventory (yielded from plants or dropped)
+		if inv.has_herbivore_food or inv.has_omnivore_food:
+			var grass_qty: int = inv.get_total_quantity_of_type(reg, _ItemTypes.Type.GRASS)
+			var plant_cal_sig: float = clampf(float(inv.max_calories) / 100.0, 0.4, 1.0) if grass_qty == 0 else clampf(float(grass_qty) / 3.0, 0.4, 1.0)
 			var food_plant_grid = _channels[_SignalTypes.FOOD_PLANT]
-			food_plant_grid.data[idx] = maxf(food_plant_grid.data[idx], clampf(float(grass_qty) / 3.0, 0.4, 1.0))
-			affordance_map[idx] |= _TileAffordance.GRAZEABLE
+			food_plant_grid.data[idx] = maxf(food_plant_grid.data[idx], plant_cal_sig)
+			affordance_map[idx] |= _TileAffordance.HERBIVORE_FOOD
 
 		# Meat emits blood scent downwind
 		if inv.has_blood_scent:

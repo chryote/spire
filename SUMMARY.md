@@ -38,6 +38,7 @@ flowchart TD
         T225["225: CreatureBodySystem"]
         T230["230: CreatureAISystem"]
         T235["235: CreatureLocomotionSystem"]
+        T240["240: CreatureAbilitySystem"]
     end
 
     subgraph Peripherals ["Presentation & Utilities"]
@@ -116,8 +117,10 @@ The 21 simulation systems execute in ascending priority order on every active si
 | **CreatureGrowthSystem** | `223` | [CreatureGrowthSystem.gd](file:///d:/GODOT/spire/modules/creature/systems/CreatureGrowthSystem.gd) | **Creature Ontogeny & Growth.** Executes on rare ticks (every 20 ticks). Advances creature aging and growth based on nutrition. Handles life stage transitions (`Juvenile → Adult → Elder`), scales physical anatomical mass/organs proportionally, unlocks mature genetic traits, and promotes ASCII glyphs (`g → G`). |
 | **TraitSystem** | `224` | [TraitSystem.gd](file:///d:/GODOT/spire/modules/creature/systems/TraitSystem.gd) | **Traits, Buffs & Debuffs.** Manages the lifecycles of genetic traits and temporary status conditions (`Well-Fed`, `Starving`, `Dehydrated`, `Exhausted`, `Panicked`, `Hypothermic`). Applies stat modifiers to metabolism, movement speed, and cognitive utility weighting. |
 | **CreatureBodySystem** | `225` | [CreatureBodySystem.gd](file:///d:/GODOT/spire/modules/creature/systems/CreatureBodySystem.gd) | **Internal Anatomy & Physiology.** Simulates stomach digestion, metabolic hunger and thirst accumulation, blood circulation, hemorrhage/bleeding, limb condition, pain thresholds, mobility reduction, and mortality checks. |
-| **CreatureAISystem** | `230` | [CreatureAISystem.gd](file:///d:/GODOT/spire/modules/creature/systems/CreatureAISystem.gd) | **Vector Utility AI & Cognitive Planner.** Samples spatial signals and tile affordances at the creature's position. Computes dot-product utility scores against state-space vector embeddings (`MindEmbeddings`) for actions (`FLEE`, `GRAZE`, `DRINK`, `REST`, `WANDER`, `IDLE`). Integrates short-term and long-term memory to prevent oscillation and generate goal-oriented waypoints. |
-| **CreatureLocomotionSystem** | `235` | [CreatureLocomotionSystem.gd](file:///d:/GODOT/spire/modules/creature/systems/CreatureLocomotionSystem.gd) | **Locomotion & Action Execution.** Navigates creatures along planned waypoints while respecting movement cooldowns and limb mobility. Executes physical world interactions (grazing grass, drinking water, resting), emits sound signals, records visited locations in memory, and triggers render updates. |
+| **CreatureAISystem** | `230` | [CreatureAISystem.gd](file:///d:/GODOT/spire/modules/creature/systems/CreatureAISystem.gd) | **Vector Utility AI & Cognitive Planner.** Samples spatial signals and tile affordances at the creature's position. Computes dot-product utility scores against state-space vector embeddings (`MindEmbeddings`) for actions (`FLEE`, `EAT`, `DRINK`, `REST`, `WANDER`, `IDLE`). Integrates diet-aware compatible food targeting, short-term and long-term memory to generate goal-oriented waypoints. |
+| **CreatureLocomotionSystem** | `235` | [CreatureLocomotionSystem.gd](file:///d:/GODOT/spire/modules/creature/systems/CreatureLocomotionSystem.gd) | **Spatial Locomotion.** Navigates creatures along planned waypoints while respecting movement cooldowns and limb mobility. Emits acoustic movement signals and updates facing and position. |
+| **CreatureAbilitySystem** | `240` | [CreatureAbilitySystem.gd](file:///d:/GODOT/spire/modules/creature/systems/CreatureAbilitySystem.gd) | **Ability & Action Execution.** Executes physical creature interactions (`EAT`, `DRINK`, `REST`, `ATTACK`) once movement reaches destination or interaction range. Consumes food matter according to diet category (`HERBIVORE`, `OMNIVORE`, `CARNIVORE`), quenches thirst, recovers fatigue under cover, and queues physical kinetic impacts. |
+
 
 ---
 

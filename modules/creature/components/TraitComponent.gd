@@ -127,7 +127,7 @@ func rebuild_cache() -> void:
 	# Defaults for actions: mult = 1.0, add = 0.0
 	for act: int in [
 		_MindEmbeddings.Action.IDLE,
-		_MindEmbeddings.Action.GRAZE,
+		_MindEmbeddings.Action.EAT,
 		_MindEmbeddings.Action.DRINK,
 		_MindEmbeddings.Action.FLEE,
 		_MindEmbeddings.Action.REST,

@@ -39,6 +39,7 @@ static func create(
 	# 1. Creature Core Component
 	var creature_comp := _CreatureComponent.new()
 	creature_comp.species_type = species_type
+	creature_comp.diet = spec_data.get("diet", 1)
 	creature_comp.creature_name = name_override if name_override != "" else spec_data.get("display_name", "Creature")
 	creature_comp.stomach_capacity = spec_data.get("stomach_capacity", 50.0)
 	creature_comp.stomach_fill = creature_comp.stomach_capacity * 0.4

@@ -231,8 +231,9 @@ func _test_creature_action_execution_via_plan() -> void:
 	plan.current_goal = _MindEmbeddings.Action.ATTACK
 	plan.target_tile = Vector2i(40, 41)
 
-	# Run CreatureLocomotionSystem tick directly
+	# Run CreatureLocomotionSystem and CreatureAbilitySystem tick directly
 	World.creature_locomotion.tick(World.tick_count)
+	World.creature_abilities.tick(World.tick_count)
 
 	# Verify ImpactEventComponent was attached to the grazer's striking limb
 	var head_limb: int = body.limbs["head"]
