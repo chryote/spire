@@ -23,6 +23,11 @@ enum GrowthStage {
 	ELDER    = 2,
 }
 
+enum Gender {
+	FEMALE = 0,
+	MALE   = 1,
+}
+
 const DATA: Dictionary = {
 	Type.GRAZER: {
 		"display_name":      "Grazer",
@@ -70,6 +75,13 @@ const DATA: Dictionary = {
 			},
 			"growth_rate_per_rare_tick": 0.015,
 		},
+		"reproduction": {
+			"female_spawn_rate":  1.0,       # female reproduction / spawn rate multiplier
+			"litter_size_min":    1,         # minimum offspring count
+			"litter_size_max":    2,         # maximum offspring count
+			"gestation_duration": 600,       # ticks required to give birth
+			"mating_cooldown":    1200,      # refractory ticks before mating again
+		},
 		"anatomy": {
 			"limbs": {
 				"head":          { "volume": 0.0025, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.0 },
@@ -78,6 +90,10 @@ const DATA: Dictionary = {
 				"right_foreleg": { "volume": 0.0020, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.25 },
 				"left_hindleg":  { "volume": 0.0025, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.25 },
 				"right_hindleg": { "volume": 0.0025, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.25 },
+			},
+			"genitals": {
+				Gender.MALE:   { "name": "male_genital",   "volume": 0.0003, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.0 },
+				Gender.FEMALE: { "name": "female_genital", "volume": 0.0003, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.0 },
 			},
 			"organs": {
 				"heart":   { "volume": 0.0004, "matter": _MaterialTypes.Type.RAW_MEAT, "vital": true },
@@ -155,6 +171,13 @@ const DATA: Dictionary = {
 			},
 			"growth_rate_per_rare_tick": 0.025,
 		},
+		"reproduction": {
+			"female_spawn_rate":  2.5,       # high fecundity hare reproduction
+			"litter_size_min":    2,
+			"litter_size_max":    5,
+			"gestation_duration": 300,       # short gestation
+			"mating_cooldown":    600,
+		},
 		"anatomy": {
 			"limbs": {
 				"head":          { "volume": 0.0006, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.0 },
@@ -163,6 +186,10 @@ const DATA: Dictionary = {
 				"right_foreleg": { "volume": 0.0004, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.25 },
 				"left_hindleg":  { "volume": 0.0006, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.25 },
 				"right_hindleg": { "volume": 0.0006, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.25 },
+			},
+			"genitals": {
+				Gender.MALE:   { "name": "male_genital",   "volume": 0.00008, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.0 },
+				Gender.FEMALE: { "name": "female_genital", "volume": 0.00008, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.0 },
 			},
 			"organs": {
 				"heart":   { "volume": 0.0001, "matter": _MaterialTypes.Type.RAW_MEAT, "vital": true },
@@ -240,6 +267,13 @@ const DATA: Dictionary = {
 			},
 			"growth_rate_per_rare_tick": 0.010,
 		},
+		"reproduction": {
+			"female_spawn_rate":  0.8,       # lower spawn rate deer reproduction
+			"litter_size_min":    1,
+			"litter_size_max":    1,
+			"gestation_duration": 900,       # long gestation
+			"mating_cooldown":    1800,
+		},
 		"anatomy": {
 			"limbs": {
 				"head":          { "volume": 0.006, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.0 },
@@ -248,6 +282,10 @@ const DATA: Dictionary = {
 				"right_foreleg": { "volume": 0.005, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.25 },
 				"left_hindleg":  { "volume": 0.006, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.25 },
 				"right_hindleg": { "volume": 0.006, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.25 },
+			},
+			"genitals": {
+				Gender.MALE:   { "name": "male_genital",   "volume": 0.0008, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.0 },
+				Gender.FEMALE: { "name": "female_genital", "volume": 0.0008, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.0 },
 			},
 			"organs": {
 				"heart":   { "volume": 0.0010, "matter": _MaterialTypes.Type.RAW_MEAT, "vital": true },
@@ -302,3 +340,14 @@ static func get_stage_name(stage: int) -> String:
 		GrowthStage.ADULT:    return "Adult"
 		GrowthStage.ELDER:    return "Elder"
 		_:                    return "Unknown"
+
+static func get_reproduction_profile(species_type: int) -> Dictionary:
+	var d: Dictionary = get_data(species_type)
+	return d.get("reproduction", {})
+
+static func get_gender_name(gender: int) -> String:
+	match gender:
+		Gender.FEMALE: return "Female"
+		Gender.MALE:   return "Male"
+		_:             return "Unknown"
+

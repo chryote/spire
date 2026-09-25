@@ -1,10 +1,10 @@
 PASSED: Tabbed Inspector HUD fully verified.
 Environment summary: [b]Terrain:[/b] [color=#90ee90]Lush Grass[/color]   [b]Biome:[/b] [color=#87ceeb]Plains[/color]
 [b]Material:[/b] Grass Turf   [b]Temp:[/b] [color=#ffcc66]16.5 °C[/color]   [b]Moisture:[/b] [color=#66ccff]45%[/color]   [b]Season:[/b] [color=#ffb6c1]Spring (Day 1)[/color]
-Creature header:     Grazer "Tracker" (eid=16395) [Adult, 100% Scale] [Herbivore] — [ALIVE] (Age: 0)
+Creature header:     Grazer "Tracker" (eid=16396) [Male] [Adult, 100% Scale] [Herbivore] — [ALIVE] (Age: 0)
 Creature thought:    [b]Current Action:[/b] [color=#ffd700][b]IDLE[/b][/color]
 [b]Thought:[/b] [i]"Standing alert and surveying surroundings."[/i]
-Creature body:       [b]Nutrition:[/b] 25.0 / 62.5 pts (40%)   [b]Mobility:[/b] 100%   [b]Mass:[/b] 35.3 kg
+Creature body:       [b]Nutrition:[/b] 25.0 / 62.5 pts (40%)   [b]Mobility:[/b] 100%   [b]Mass:[/b] 35.7 kg
 [b]Blood:[/b] 2.20 / 2.20 L   [b]Core Temp:[/b] 38.0 °C
 Creature drives:     [b]Hunger:[/b] [color=#ffaa33]20%[/color]   [b]Thirst:[/b] [color=#33ccff]10%[/color]   [b]Fear:[/b] [color=#ff5555]0%[/color]   [b]Fatigue:[/b] [color=#cc99ff]0%[/color]
-[b]Curiosity:[/b] [color=#ffee55]50%[/color]   [b]Pain:[/b] [color=#ff4444]0%[/color]   [b]Comfort:[/b] [color=#66ff99]80%[/color]   [b]Social:[/b] [color=#ff99cc]0%[/color]
+[b]Curiosity:[/b] [color=#ffee55]50%[/color]   [b]Pain:[/b] [color=#ff4444]0%[/color]   [b]Comfort:[/b] [color=#66ff99]80%[/color]   [b]Social:[/b] [color=#ff99cc]0%[/color]   [b]Mating:[/b] [color=#ff66aa]30%[/color]

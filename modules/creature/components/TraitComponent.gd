@@ -131,7 +131,9 @@ func rebuild_cache() -> void:
 		_MindEmbeddings.Action.DRINK,
 		_MindEmbeddings.Action.FLEE,
 		_MindEmbeddings.Action.REST,
-		_MindEmbeddings.Action.WANDER
+		_MindEmbeddings.Action.WANDER,
+		_MindEmbeddings.Action.ATTACK,
+		_MindEmbeddings.Action.MATE,
 	]:
 		_action_weights[act] = { "mult": 1.0, "add": 0.0 }
 

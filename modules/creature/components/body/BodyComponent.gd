@@ -121,3 +121,51 @@ func rescale_anatomy(reg, new_scale: float, old_scale: float) -> void:
 					part["volume"] *= factor
 				if part.has("mass"):
 					part["mass"] *= factor
+
+## Returns the name of the genital limb ("male_genital", "female_genital"), or empty string if none.
+func get_genital_limb_name() -> String:
+	for limb_name: String in limbs:
+		if limb_name.ends_with("genital"):
+			return limb_name
+	return ""
+
+## Checks whether the creature has an intact, functional genital limb.
+func has_intact_genital(reg, genital_name: String = "") -> bool:
+	var g_name: String = genital_name if genital_name != "" else get_genital_limb_name()
+	if g_name == "" or not limbs.has(g_name):
+		return false
+	if reg == null:
+		return true
+
+	var item_store: Dictionary = reg.get_store(&"ItemComponent")
+	var eid: int = limbs.get(g_name, -1)
+	if eid == -1:
+		return false
+
+	var item = item_store.get(eid, null)
+	if item != null:
+		var flesh_wear: float = item.parts.get("flesh", {}).get("wear", 0.0) as float
+		var bone_wear: float  = item.parts.get("bone", {}).get("wear", 0.0) as float
+		return maxf(flesh_wear, bone_wear) < 1.0
+	return true
+
+## Returns the physical wear factor [0.0, 1.0] of the genital limb.
+func get_genital_wear(reg, genital_name: String = "") -> float:
+	var g_name: String = genital_name if genital_name != "" else get_genital_limb_name()
+	if g_name == "" or not limbs.has(g_name):
+		return 1.0
+	if reg == null:
+		return 0.0
+
+	var item_store: Dictionary = reg.get_store(&"ItemComponent")
+	var eid: int = limbs.get(g_name, -1)
+	if eid == -1:
+		return 1.0
+
+	var item = item_store.get(eid, null)
+	if item != null:
+		var flesh_wear: float = item.parts.get("flesh", {}).get("wear", 0.0) as float
+		var bone_wear: float  = item.parts.get("bone", {}).get("wear", 0.0) as float
+		return clampf(maxf(flesh_wear, bone_wear), 0.0, 1.0)
+	return 0.0
+

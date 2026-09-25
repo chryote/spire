@@ -6,7 +6,7 @@ extends Resource
 
 const _MindEmbeddings = preload("res://modules/creature/data/MindEmbeddings.gd")
 
-## 8-dimensional normalized state vector representing biological imperatives.
+## 9-dimensional normalized state vector representing biological imperatives.
 ## Indices defined in MindEmbeddings.Drive.
 var drives: PackedFloat32Array = PackedFloat32Array()
 
@@ -27,6 +27,7 @@ func _init() -> void:
 	drives[_MindEmbeddings.Drive.THIRST]    = 0.1
 	drives[_MindEmbeddings.Drive.CURIOSITY] = 0.5
 	drives[_MindEmbeddings.Drive.COMFORT]   = 0.8
+	drives[_MindEmbeddings.Drive.MATING]    = 0.3
 
 ## Convenience drive property accessors
 var hunger: float:
@@ -52,3 +53,8 @@ var curiosity: float:
 var pain: float:
 	get: return drives[_MindEmbeddings.Drive.PAIN] if drives.size() > 5 else 0.0
 	set(v): if drives.size() > 5: drives[_MindEmbeddings.Drive.PAIN] = clampf(v, 0.0, 1.0)
+
+var mating: float:
+	get: return drives[_MindEmbeddings.Drive.MATING] if drives.size() > _MindEmbeddings.Drive.MATING else 0.0
+	set(v): if drives.size() > _MindEmbeddings.Drive.MATING: drives[_MindEmbeddings.Drive.MATING] = clampf(v, 0.0, 1.0)
+

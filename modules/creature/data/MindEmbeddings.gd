@@ -8,7 +8,7 @@ extends RefCounted
 
 const _DietTypes = preload("res://modules/matter/data/DietTypes.gd")
 
-const DIMENSIONS: int = 8
+const DIMENSIONS: int = 9
 
 enum Drive {
 	HUNGER      = 0,
@@ -19,6 +19,7 @@ enum Drive {
 	PAIN        = 5,
 	COMFORT     = 6,
 	SOCIABILITY = 7,
+	MATING      = 8,
 }
 
 enum Action {
@@ -29,21 +30,23 @@ enum Action {
 	REST   = 4,
 	WANDER = 5,
 	ATTACK = 6,
+	MATE   = 7,
 }
 
 ## Backward-compatible alias for Action.EAT
 const GRAZE: int = Action.EAT
 
-## Action prototype vectors in R^8 representing optimal drive alignment.
-## [HUNGER, THIRST, FEAR, FATIGUE, CURIOSITY, PAIN, COMFORT, SOCIABILITY]
+## Action prototype vectors in R^9 representing optimal drive alignment.
+## [HUNGER, THIRST, FEAR, FATIGUE, CURIOSITY, PAIN, COMFORT, SOCIABILITY, MATING]
 const ACTION_PROTOTYPES: Dictionary = {
-	Action.EAT:    [1.00, 0.10, 0.00, 0.00, 0.10, 0.00, 0.10, 0.00],
-	Action.DRINK:  [0.10, 1.00, 0.00, 0.00, 0.10, 0.00, 0.10, 0.00],
-	Action.FLEE:   [0.00, 0.00, 1.00, 0.00, 0.00, 0.80, 0.00, 0.00],
-	Action.REST:   [0.05, 0.05, 0.00, 1.00, 0.00, 0.20, 0.50, 0.00],
-	Action.WANDER: [0.20, 0.10, 0.00, 0.00, 0.90, 0.00, 0.20, 0.10],
-	Action.IDLE:   [0.05, 0.05, 0.00, 0.10, 0.10, 0.00, 0.20, 0.00],
-	Action.ATTACK: [0.30, 0.00, 0.35, 0.00, 0.10, 0.65, 0.00, 0.00],
+	Action.EAT:    [1.00, 0.10, 0.00, 0.00, 0.10, 0.00, 0.10, 0.00, 0.00],
+	Action.DRINK:  [0.10, 1.00, 0.00, 0.00, 0.10, 0.00, 0.10, 0.00, 0.00],
+	Action.FLEE:   [0.00, 0.00, 1.00, 0.00, 0.00, 0.80, 0.00, 0.00, 0.00],
+	Action.REST:   [0.05, 0.05, 0.00, 1.00, 0.00, 0.20, 0.50, 0.00, 0.00],
+	Action.WANDER: [0.20, 0.10, 0.00, 0.00, 0.90, 0.00, 0.20, 0.10, 0.05],
+	Action.IDLE:   [0.05, 0.05, 0.00, 0.10, 0.10, 0.00, 0.20, 0.00, 0.00],
+	Action.ATTACK: [0.30, 0.00, 0.35, 0.00, 0.10, 0.65, 0.00, 0.00, 0.00],
+	Action.MATE:   [0.00, 0.00, 0.00, 0.00, 0.10, 0.00, 0.30, 0.40, 1.00],
 }
 
 ## Create a blank zeroed embedding vector.
@@ -156,4 +159,19 @@ static func evaluate_utility(
 				return clampf(pain * 0.7 + fear * 0.5, 0.0, 1.0)
 			return 0.0
 
+		Action.MATE:
+			var mating_drive: float = drives[Drive.MATING] if drives.size() > Drive.MATING else 0.0
+			var hunger: float       = drives[Drive.HUNGER]
+			var thirst: float       = drives[Drive.THIRST] if drives.size() > Drive.THIRST else 0.0
+			var fear: float         = drives[Drive.FEAR]
+			var pain: float         = drives[Drive.PAIN]
+			var mate_avail: float   = perception.get(&"mate_nearby", 0.5) as float
+
+			# High survival hazards (panic fear, severe pain, critical starvation or thirst) inhibit mating
+			var survival_threat: float = clampf(maxf(fear, maxf(pain, maxf(pow(hunger, 1.4) * 0.8, pow(thirst, 1.4) * 0.8))), 0.0, 1.0)
+			# Mating drive directly and powerfully drives mating utility
+			var urge: float = pow(mating_drive, 1.1)
+			return clampf(urge * (0.80 + mate_avail * 0.40) * (1.0 - survival_threat), 0.0, 1.0)
+
 	return clampf(base_score, 0.0, 1.0)
+

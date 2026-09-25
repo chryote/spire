@@ -80,6 +80,7 @@ func tick(tick_number: int) -> void:
 			_MindEmbeddings.Action.EAT,
 			_MindEmbeddings.Action.DRINK,
 			_MindEmbeddings.Action.REST,
+			_MindEmbeddings.Action.MATE,
 			_MindEmbeddings.Action.WANDER,
 			_MindEmbeddings.Action.IDLE
 		]:
@@ -115,6 +116,9 @@ func tick(tick_number: int) -> void:
 
 			_MindEmbeddings.Action.ATTACK:
 				_plan_attack(cur_pos, plan, pos_comp)
+
+			_MindEmbeddings.Action.MATE:
+				_plan_mate(cur_pos, plan, eid, pos_comp, mem, tick_number)
 
 			_MindEmbeddings.Action.IDLE:
 				plan.clear_path()
@@ -439,3 +443,80 @@ func _plan_attack(cur_pos: Vector2i, plan: _ActionPlanComponent, pos_comp: _Posi
 	if world.is_valid_position(facing_pos):
 		plan.target_tile = facing_pos
 		plan.clear_path()
+
+func _plan_mate(
+	cur_pos: Vector2i,
+	plan: _ActionPlanComponent,
+	eid: int,
+	pos_comp: _PositionComponent,
+	mem: _MemoryComponent,
+	tick_number: int
+) -> void:
+	var reg = world.get_registry()
+	if reg == null or world.mating_system == null:
+		_plan_wander(cur_pos, plan, pos_comp, mem, tick_number)
+		return
+
+	var pos_store: Dictionary = reg.get_store(&"PositionComponent")
+	var mating_sys = world.mating_system
+
+	# 1. If currently targeting a valid mate and already adjacent, hold position to mate!
+	if plan.target_tile != Vector2i(-1, -1) and cur_pos.distance_squared_to(plan.target_tile) <= 2:
+		var target_eid: int = world.get_creature_at(plan.target_tile)
+		if target_eid != -1 and mating_sys.can_mate(eid, target_eid):
+			plan.clear_path()
+			return
+
+	# 2. If en-route to a valid partner, keep following path
+	if not plan.path_queue.is_empty() and plan.target_tile != Vector2i(-1, -1):
+		var target_eid: int = world.get_creature_at(plan.target_tile)
+		if target_eid != -1 and mating_sys.can_mate(eid, target_eid):
+			return
+
+	# 3. Search for the best mating candidate using trait matching preferences
+	var best_candidate: int = -1
+	var best_pos := Vector2i(-1, -1)
+	var best_score: float = -999.0
+
+	for cand_eid: int in pos_store:
+		if cand_eid == eid:
+			continue
+
+		var cand_pos: Vector2i = pos_store[cand_eid].position
+		var dist: float = cur_pos.distance_to(cand_pos)
+		if dist > 16.0:
+			continue
+
+		if not mating_sys.can_mate(eid, cand_eid):
+			continue
+
+		# Trait matching preference score [0.0, 1.0]
+		var pref: float = mating_sys.calculate_trait_matching_score(eid, cand_eid)
+		# Score balances trait preference and distance
+		var score: float = (pref * 3.0) - (dist * 0.10)
+		if score > best_score:
+			best_score = score
+			best_candidate = cand_eid
+			best_pos = cand_pos
+
+	# 4. Check long-term memory for remembered mate encounter if none found nearby
+	if best_candidate == -1 and mem != null:
+		var remembered_mate := mem.get_closest_landmark(&"mate", cur_pos)
+		if remembered_mate != Vector2i(-1, -1) and world.is_valid_position(remembered_mate):
+			var cand_at_mem: int = world.get_creature_at(remembered_mate)
+			if cand_at_mem != -1 and mating_sys.can_mate(eid, cand_at_mem):
+				best_candidate = cand_at_mem
+				best_pos = remembered_mate
+
+	# 5. Pathfind towards best candidate or wander to search
+	if best_candidate != -1 and best_pos != Vector2i(-1, -1):
+		plan.target_tile = best_pos
+		if cur_pos.distance_squared_to(best_pos) <= 2:
+			plan.clear_path()
+		else:
+			plan.path_queue = _build_simple_path(cur_pos, best_pos)
+		if mem != null:
+			mem.remember_landmark(best_pos, &"mate", 1.0, tick_number)
+	else:
+		_plan_wander(cur_pos, plan, pos_comp, mem, tick_number)
+

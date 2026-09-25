@@ -82,6 +82,10 @@ func tick(tick_number: int) -> void:
 				if pos_comp.position.distance_squared_to(plan.target_tile) <= 2 or plan.path_queue.is_empty():
 					_execute_attack(eid, pos_comp, creature, mind, plan, traits, tick_number)
 
+			_MindEmbeddings.Action.MATE:
+				if pos_comp.position.distance_squared_to(plan.target_tile) <= 2 or plan.path_queue.is_empty():
+					_execute_mate(eid, pos_comp.position, plan.target_tile, pos_comp, creature, mind, mem, plan, tick_number)
+
 func _execute_eat(
 	_creature_eid: int,
 	pos: Vector2i,
@@ -285,6 +289,49 @@ func _execute_rest(
 		print("[Creature] %s resting at %s. Fatigue: %.2f." % [
 			creature.creature_name, pos, mind.fatigue
 		])
+
+func _execute_mate(
+	eid: int,
+	pos: Vector2i,
+	target_pos: Vector2i,
+	pos_comp: _PositionComponent,
+	creature: _CreatureComponent,
+	mind: _MindComponent,
+	mem: _MemoryComponent,
+	plan: _ActionPlanComponent,
+	tick_number: int
+) -> void:
+	if world == null or world.mating_system == null:
+		plan.clear_path()
+		return
+
+	if target_pos != pos and pos_comp != null:
+		var face_dir := Vector2i(signi(target_pos.x - pos.x), signi(target_pos.y - pos.y))
+		if face_dir != Vector2i.ZERO:
+			pos_comp.facing = face_dir
+
+	var partner_eid: int = world.get_creature_at(target_pos)
+	if partner_eid == -1:
+		for dy in range(-1, 2):
+			for dx in range(-1, 2):
+				if dx == 0 and dy == 0:
+					continue
+				var check_pos := Vector2i(pos.x + dx, pos.y + dy)
+				var c_eid: int = world.get_creature_at(check_pos)
+				if c_eid != -1 and c_eid != eid and world.mating_system.can_mate(eid, c_eid):
+					partner_eid = c_eid
+					break
+			if partner_eid != -1:
+				break
+
+	if partner_eid == -1:
+		plan.clear_path()
+		return
+
+	var success: bool = world.mating_system.attempt_mating(eid, partner_eid)
+	plan.clear_path()
+	if success:
+		world.mark_render_dirty()
 
 func queue_creature_impact(
 	creature_eid: int,

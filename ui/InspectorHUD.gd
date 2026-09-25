@@ -549,10 +549,21 @@ func _render_creature(reg, ceid: int) -> void:
 		var scale_pct: int = int(round(growth.current_scale * 100.0))
 		stage_str = " [%s, %d%% Scale]" % [s_name, scale_pct]
 
+	var gender_str: String = " [%s]" % _CreatureTypes.get_gender_name(creature.gender)
+	var mating_comp = reg.get_component(ceid, &"MatingComponent")
+	var repro_str: String = ""
+	if mating_comp != null and mating_comp.is_female():
+		if mating_comp.is_pregnant:
+			repro_str = " [color=#ff69b4][b][PREGNANT: %d/%d ticks][/b][/color] (Spawnrate: %.2f)" % [
+				mating_comp.gestation_ticks, mating_comp.gestation_duration, mating_comp.spawn_rate
+			]
+		else:
+			repro_str = " (Spawnrate: %.2f)" % mating_comp.spawn_rate
+
 	if creature_header_label != null:
 		var diet_name: String = _DietTypes.get_category_name(creature.diet)
-		creature_header_label.text = "%s \"%s\" (eid=%d)%s [%s] — %s (Age: %d)" % [
-			species_name, creature.creature_name, ceid, stage_str, diet_name, status_str, creature.age_ticks
+		creature_header_label.text = "%s \"%s\" (eid=%d)%s%s [%s]%s — %s (Age: %d)" % [
+			species_name, creature.creature_name, ceid, gender_str, stage_str, diet_name, repro_str, status_str, creature.age_ticks
 		]
 
 	# --- Thought & Action ---
@@ -599,6 +610,14 @@ func _render_creature(reg, ceid: int) -> void:
 				thought_text = "Curiously exploring terrain (curiosity drive: %.0f%%)." % [
 					mind.curiosity * 100.0 if mind != null else 50.0
 				]
+			_MindEmbeddings.Action.MATE:
+				act_name = "MATE"
+				if plan.target_tile == selected_tile or plan.path_queue.is_empty():
+					thought_text = "Courting partner and engaging in mating."
+				else:
+					thought_text = "Seeking compatible partner with desirable traits (mating drive: %.0f%%)." % [
+						mind.mating * 100.0 if mind != null else 50.0
+					]
 			_MindEmbeddings.Action.IDLE:
 				act_name = "IDLE"
 				thought_text = "Standing alert and surveying surroundings."
@@ -620,6 +639,7 @@ func _render_creature(reg, ceid: int) -> void:
 			_MindEmbeddings.Action.DRINK,
 			_MindEmbeddings.Action.FLEE,
 			_MindEmbeddings.Action.REST,
+			_MindEmbeddings.Action.MATE,
 			_MindEmbeddings.Action.WANDER,
 			_MindEmbeddings.Action.IDLE
 		]:
@@ -803,6 +823,9 @@ func _render_creature(reg, ceid: int) -> void:
 		elif mind.curiosity > 0.5:
 			mood_str = "Curious & Exploring"
 			mood_col = Color(0.8, 0.9, 0.5)
+		elif mind.mating > 0.6:
+			mood_str = "In Heat & Seeking Mate"
+			mood_col = Color(1.0, 0.5, 0.8)
 
 		if creature_mood_label != null:
 			creature_mood_label.text = "Mood: %s" % mood_str
@@ -816,7 +839,8 @@ func _render_creature(reg, ceid: int) -> void:
 			"[b]Curiosity:[/b] [color=#ffee55]%.0f%%[/color]   " +
 			"[b]Pain:[/b] [color=#ff4444]%.0f%%[/color]   " +
 			"[b]Comfort:[/b] [color=#66ff99]%.0f%%[/color]   " +
-			"[b]Social:[/b] [color=#ff99cc]%.0f%%[/color]"
+			"[b]Social:[/b] [color=#ff99cc]%.0f%%[/color]   " +
+			"[b]Mating:[/b] [color=#ff66aa]%.0f%%[/color]"
 		) % [
 			mind.hunger * 100.0,
 			mind.thirst * 100.0,
@@ -825,7 +849,8 @@ func _render_creature(reg, ceid: int) -> void:
 			mind.curiosity * 100.0,
 			mind.pain * 100.0,
 			(mind.drives[_MindEmbeddings.Drive.COMFORT] if mind.drives.size() > 6 else 0.0) * 100.0,
-			(mind.drives[_MindEmbeddings.Drive.SOCIABILITY] if mind.drives.size() > 7 else 0.0) * 100.0
+			(mind.drives[_MindEmbeddings.Drive.SOCIABILITY] if mind.drives.size() > 7 else 0.0) * 100.0,
+			mind.mating * 100.0
 		]
 
 		if creature_drives_label != null:

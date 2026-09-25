@@ -9,6 +9,12 @@ var species_type: int = 0
 ## Diet category from DietTypes.Category (1=HERBIVORE, 2=OMNIVORE, 3=CARNIVORE).
 var diet: int = 1
 
+## Biological sex / gender from CreatureTypes.Gender (0=FEMALE, 1=MALE).
+var gender: int = 0
+
+## Reproduction / spawn rate multiplier (for female creatures, 0.0 for males).
+var spawn_rate: float = 0.0
+
 ## Human-readable individual name.
 var creature_name: String = "Creature"
 

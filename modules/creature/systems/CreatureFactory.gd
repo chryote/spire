@@ -20,6 +20,7 @@ const _ItemFactory         = preload("res://modules/item/systems/ItemFactory.gd"
 const _ItemTypes           = preload("res://modules/item/data/ItemTypes.gd")
 const _MatterComponent     = preload("res://modules/matter/components/MatterComponent.gd")
 const _MaterialTypes       = preload("res://modules/matter/data/MaterialTypes.gd")
+const _MatingComponent     = preload("res://modules/creature/components/MatingComponent.gd")
 
 ## Instantiates a creature entity and its physical anatomical sub-entities.
 static func create(
@@ -28,7 +29,8 @@ static func create(
 	spawn_pos: Vector2i,
 	name_override: String = "",
 	initial_traits: Array[int] = [],
-	start_stage: int = -1
+	start_stage: int = -1,
+	gender_override: int = -1
 ) -> int:
 	if world == null:
 		return -1
@@ -40,6 +42,7 @@ static func create(
 	var creature_comp := _CreatureComponent.new()
 	creature_comp.species_type = species_type
 	creature_comp.diet = spec_data.get("diet", 1)
+	creature_comp.gender = gender_override if gender_override >= 0 else (randi() % 2)
 	creature_comp.creature_name = name_override if name_override != "" else spec_data.get("display_name", "Creature")
 	creature_comp.stomach_capacity = spec_data.get("stomach_capacity", 50.0)
 	creature_comp.stomach_fill = creature_comp.stomach_capacity * 0.4
@@ -81,6 +84,31 @@ static func create(
 					if part.has("mass"):
 						part["mass"] *= scale_factor
 		body_comp.limbs[limb_name] = limb_eid
+
+	# 3a. Genital Limb (Male or Female based on gender)
+	var genitals_cfg: Dictionary = anatomy.get("genitals", {})
+	var gen_cfg: Dictionary = genitals_cfg.get(creature_comp.gender, {})
+	var gen_name: String = gen_cfg.get("name", "male_genital" if creature_comp.gender == _CreatureTypes.Gender.MALE else "female_genital")
+	var gen_eid: int = _ItemFactory.create_composite(world, _ItemTypes.Type.LIMB, {
+		"flesh": gen_cfg.get("flesh", 12),
+		"bone":  gen_cfg.get("bone",  21),
+	})
+	var gen_item = world.get_component(gen_eid, &"ItemComponent")
+	if gen_item != null:
+		gen_item.container_id = creature_eid
+		gen_item.display_name = "%s's %s" % [creature_comp.creature_name, gen_name.capitalize()]
+		var target_vol: float = gen_cfg.get("volume", 0.0003) as float
+		if target_vol > 0.0 and gen_item.total_volume > 0.0:
+			var scale_factor: float = target_vol / gen_item.total_volume
+			gen_item.total_volume = target_vol
+			gen_item.total_mass *= scale_factor
+			for p_name in gen_item.parts:
+				var part = gen_item.parts[p_name]
+				if part.has("volume"):
+					part["volume"] *= scale_factor
+				if part.has("mass"):
+					part["mass"] *= scale_factor
+	body_comp.limbs[gen_name] = gen_eid
 
 	var organs_cfg: Dictionary = anatomy.get("organs", {})
 	for organ_name: String in organs_cfg:
@@ -187,4 +215,37 @@ static func create(
 
 	world.add_component(creature_eid, growth_comp)
 
+	# 10. Reproduction & Mating Component
+	var mating_comp := _MatingComponent.new()
+	mating_comp.gender = creature_comp.gender
+
+	var repro_cfg: Dictionary = _CreatureTypes.get_reproduction_profile(species_type)
+	mating_comp.litter_size_min = repro_cfg.get("litter_size_min", 1)
+	mating_comp.litter_size_max = repro_cfg.get("litter_size_max", 2)
+	mating_comp.gestation_duration = repro_cfg.get("gestation_duration", 600)
+
+	if creature_comp.gender == _CreatureTypes.Gender.FEMALE:
+		var base_spawn_rate: float = repro_cfg.get("female_spawn_rate", 1.0) as float
+		if trait_comp.has_genetic_trait(_TraitTypes.Type.HARDY):
+			base_spawn_rate *= 1.15
+		if trait_comp.has_genetic_trait(_TraitTypes.Type.FRAIL):
+			base_spawn_rate *= 0.75
+		mating_comp.spawn_rate = base_spawn_rate
+		creature_comp.spawn_rate = base_spawn_rate
+	else:
+		mating_comp.spawn_rate = 0.0
+		creature_comp.spawn_rate = 0.0
+
+	# Trait matching preferences: select 1-2 traits preferred in a partner
+	var p_pool: Array = spec_data.get("trait_pool", []).duplicate()
+	p_pool.append_array(spec_data.get("innate_traits", []))
+	if not p_pool.is_empty():
+		p_pool.shuffle()
+		mating_comp.preferred_traits.append(p_pool[0])
+		if p_pool.size() > 1 and randf() < 0.5:
+			mating_comp.preferred_traits.append(p_pool[1])
+
+	world.add_component(creature_eid, mating_comp)
+
 	return creature_eid
+

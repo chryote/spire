@@ -41,6 +41,7 @@ const _SignalSystem          = preload("res://modules/signal/systems/SignalSyste
 const _CreatureGrowthSystem     = preload("res://modules/creature/systems/CreatureGrowthSystem.gd")
 const _TraitSystem              = preload("res://modules/creature/systems/TraitSystem.gd")
 const _CreatureBodySystem       = preload("res://modules/creature/systems/CreatureBodySystem.gd")
+const _MatingSystem             = preload("res://modules/creature/systems/MatingSystem.gd")
 const _CreatureAISystem         = preload("res://modules/creature/systems/CreatureAISystem.gd")
 const _CreatureLocomotionSystem = preload("res://modules/creature/systems/CreatureLocomotionSystem.gd")
 const _CreatureAbilitySystem    = preload("res://modules/creature/systems/CreatureAbilitySystem.gd")
@@ -141,6 +142,7 @@ var _registry = null   # ComponentRegistry instance
 var _sim_systems: Array = []
 var impact_solver = null
 var signals = null
+var mating_system = null
 var creature_locomotion = null
 var creature_abilities = null
 
@@ -317,10 +319,12 @@ func _register_modules() -> void:
 	signals = _SignalSystem.new()
 	_add_system(signals, 220)
 
-	# --- Creature module (priorities 223, 224, 225, 230, 235, 240) ---
+	# --- Creature module (priorities 223, 224, 225, 226, 230, 235, 240) ---
 	_add_system(_CreatureGrowthSystem.new(), 223)
 	_add_system(_TraitSystem.new(), 224)
 	_add_system(_CreatureBodySystem.new(), 225)
+	mating_system = _MatingSystem.new()
+	_add_system(mating_system, 226)
 	_add_system(_CreatureAISystem.new(), 230)
 	creature_locomotion = _CreatureLocomotionSystem.new()
 	_add_system(creature_locomotion, 235)
