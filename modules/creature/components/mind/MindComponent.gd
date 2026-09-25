@@ -23,11 +23,12 @@ func _init() -> void:
 	drives.resize(_MindEmbeddings.DIMENSIONS)
 	drives.fill(0.0)
 	# Initial comfortable baseline
-	drives[_MindEmbeddings.Drive.HUNGER]    = 0.2
-	drives[_MindEmbeddings.Drive.THIRST]    = 0.1
-	drives[_MindEmbeddings.Drive.CURIOSITY] = 0.5
-	drives[_MindEmbeddings.Drive.COMFORT]   = 0.8
-	drives[_MindEmbeddings.Drive.MATING]    = 0.3
+	drives[_MindEmbeddings.Drive.HUNGER]      = 0.2
+	drives[_MindEmbeddings.Drive.THIRST]      = 0.1
+	drives[_MindEmbeddings.Drive.CURIOSITY]   = 0.5
+	drives[_MindEmbeddings.Drive.COMFORT]     = 0.8
+	drives[_MindEmbeddings.Drive.SOCIABILITY] = 0.2
+	drives[_MindEmbeddings.Drive.MATING]      = 0.3
 
 ## Convenience drive property accessors
 var hunger: float:
@@ -53,6 +54,10 @@ var curiosity: float:
 var pain: float:
 	get: return drives[_MindEmbeddings.Drive.PAIN] if drives.size() > 5 else 0.0
 	set(v): if drives.size() > 5: drives[_MindEmbeddings.Drive.PAIN] = clampf(v, 0.0, 1.0)
+
+var sociability: float:
+	get: return drives[_MindEmbeddings.Drive.SOCIABILITY] if drives.size() > _MindEmbeddings.Drive.SOCIABILITY else 0.0
+	set(v): if drives.size() > _MindEmbeddings.Drive.SOCIABILITY: drives[_MindEmbeddings.Drive.SOCIABILITY] = clampf(v, 0.0, 1.0)
 
 var mating: float:
 	get: return drives[_MindEmbeddings.Drive.MATING] if drives.size() > _MindEmbeddings.Drive.MATING else 0.0

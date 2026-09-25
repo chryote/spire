@@ -25,6 +25,8 @@ enum Type {
 	VIGILANT     = 7,
 	TOUGH        = 8,
 	FRAIL        = 9,
+	GREGARIOUS   = 10,
+	SOLITARY     = 11,
 
 	# --- Buffs (100 - 199) ---
 	WELL_FED        = 100,
@@ -163,6 +165,36 @@ const DATA: Dictionary = {
 		"stat_modifiers": {
 			"move_cooldown": 1,
 			"fatigue_gain_mult": 1.30,
+		}
+	},
+	Type.GREGARIOUS: {
+		"name": "Gregarious",
+		"description": "Naturally drawn to peers; thrives in herds and seeks companionship.",
+		"category": Category.GENETIC,
+		"color": Color(0.45, 0.85, 0.95, 1.0),
+		"action_weights": {
+			_MindEmbeddings.Action.WANDER: { "add": -0.05, "mult": 0.90 },
+		},
+		"stat_modifiers": {
+			"sociality_offset": 0.20,
+			"pair_bond_offset": 0.20,
+			"monogamy_offset":  0.15,
+			"kinship_offset":   0.20,
+		}
+	},
+	Type.SOLITARY: {
+		"name": "Solitary",
+		"description": "Independent lone wanderer; prefers seclusion and dislikes crowded groups.",
+		"category": Category.GENETIC,
+		"color": Color(0.85, 0.50, 0.70, 1.0),
+		"action_weights": {
+			_MindEmbeddings.Action.WANDER: { "add": 0.15, "mult": 1.25 },
+		},
+		"stat_modifiers": {
+			"sociality_offset": -0.30,
+			"pair_bond_offset": -0.20,
+			"monogamy_offset":  -0.20,
+			"kinship_offset":   -0.25,
 		}
 	},
 

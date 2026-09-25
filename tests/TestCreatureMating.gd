@@ -20,6 +20,7 @@ const _GrowthComponent     = preload("res://modules/creature/components/GrowthCo
 const _TraitTypes          = preload("res://modules/creature/data/TraitTypes.gd")
 const _MindEmbeddings      = preload("res://modules/creature/data/MindEmbeddings.gd")
 const _ItemComponent       = preload("res://modules/item/components/ItemComponent.gd")
+const _SocialComponent     = preload("res://modules/creature/components/SocialComponent.gd")
 
 func _ready() -> void:
 	print("\n=== STARTING CREATURE MATING SYSTEM TEST ===")
@@ -34,6 +35,7 @@ func _ready() -> void:
 	_test_female_spawnrate_data()
 	_test_mind_embeddings_mating_drive()
 	_test_end_to_end_mating_gestation_and_birth()
+	_test_pair_bond_fidelity_and_monogamy()
 
 	print("\n>>> ALL CREATURE MATING SYSTEM TESTS PASSED! <<<\n")
 	_write_log_artifact()
@@ -326,6 +328,102 @@ func _test_end_to_end_mating_gestation_and_birth() -> void:
 	])
 	print("  -> PASSED: Full reproductive cycle (courtship, conception, gestation, birth) verified.")
 
+func _test_pair_bond_fidelity_and_monogamy() -> void:
+	print("\n[Test 7] Testing Pair-Bond Fidelity / Monogamy Level tendency...")
+	var reg = World.get_registry()
+	assert(reg != null, "World registry must be valid")
+
+	var spawn_pos := Vector2i(40, 40)
+
+	# 1. Baseline species monogamy checks
+	var g_eid: int = _CreatureFactory.create(World, _CreatureTypes.Type.GRAZER, spawn_pos, "GrazerCheck", [])
+	var d_eid: int = _CreatureFactory.create(World, _CreatureTypes.Type.DEER, spawn_pos, "DeerCheck", [])
+	var h_eid: int = _CreatureFactory.create(World, _CreatureTypes.Type.HARE, spawn_pos, "HareCheck", [])
+
+	var g_soc: _SocialComponent = reg.get_component(g_eid, &"SocialComponent")
+	var d_soc: _SocialComponent = reg.get_component(d_eid, &"SocialComponent")
+	var h_soc: _SocialComponent = reg.get_component(h_eid, &"SocialComponent")
+
+	assert(is_equal_approx(g_soc.monogamy_tendency, 0.70), "Grazer baseline monogamy must be 0.70")
+	assert(is_equal_approx(d_soc.monogamy_tendency, 0.30), "Deer baseline monogamy must be 0.30")
+	assert(is_equal_approx(h_soc.monogamy_tendency, 0.05), "Hare baseline monogamy must be 0.05")
+
+	# 2. Form a pair bond between MaleGrazerA and FemaleGrazerA
+	var pos_a := Vector2i(42, 42)
+	var male_a: int = _CreatureFactory.create(
+		World, _CreatureTypes.Type.GRAZER, pos_a, "GrazerMaleA", [], -1, _CreatureTypes.Gender.MALE
+	)
+	var female_a: int = _CreatureFactory.create(
+		World, _CreatureTypes.Type.GRAZER, pos_a + Vector2i(1, 0), "GrazerFemaleA", [], -1, _CreatureTypes.Gender.FEMALE
+	)
+	var male_b: int = _CreatureFactory.create(
+		World, _CreatureTypes.Type.GRAZER, pos_a + Vector2i(0, 1), "GrazerMaleB_Suitor", [], -1, _CreatureTypes.Gender.MALE
+	)
+
+	var soc_ma: _SocialComponent = reg.get_component(male_a, &"SocialComponent")
+	var soc_fa: _SocialComponent = reg.get_component(female_a, &"SocialComponent")
+	var soc_mb: _SocialComponent = reg.get_component(male_b, &"SocialComponent")
+
+	soc_ma.bonded_partner_eid = female_a
+	soc_fa.bonded_partner_eid = male_a
+
+	assert(soc_fa.has_bonded_partner(), "Female A must have bonded partner")
+	assert(soc_fa.is_partner_alive(reg), "Male A must be reported as alive partner")
+
+	# 3. High monogamy fidelity: Female A must reject outside suitor Male B
+	var mating_sys: MatingSystem = World.mating_system
+	assert(mating_sys != null, "MatingSystem must exist")
+
+	var can_fa_mb: bool = mating_sys.can_mate(female_a, male_b)
+	var can_mb_fa: bool = mating_sys.can_mate(male_b, female_a)
+	assert(not can_fa_mb and not can_mb_fa, "High fidelity Grazer must reject mating with outside suitor while partner is alive")
+
+	# Trait matching preference towards stranger must be 0.0 due to high monogamy penalty
+	var score_stranger: float = mating_sys.calculate_trait_matching_score(female_a, male_b)
+	assert(score_stranger == 0.0, "Score towards outside suitor must be 0.0 for high monogamy creature (got %.2f)" % score_stranger)
+
+	# Trait matching preference towards bonded partner gets loyalty bonus
+	var score_partner: float = mating_sys.calculate_trait_matching_score(female_a, male_a)
+	assert(score_partner > 0.60, "Score towards bonded partner must have loyalty bonus (got %.2f)" % score_partner)
+
+	# Mating attempt with outside suitor must fail
+	var mated_stranger: bool = mating_sys.attempt_mating(female_a, male_b)
+	assert(not mated_stranger, "Attempted mating between faithful partner and outside suitor must be rejected")
+
+	# Mating with bonded partner must be allowed
+	var can_partners_mate: bool = mating_sys.can_mate(female_a, male_a)
+	assert(can_partners_mate, "Bonded partners must be able to mate")
+
+	# 4. Widowhood: Kill bonded partner Male A and verify Female A is now receptive to suitors
+	var male_a_creature: _CreatureComponent = reg.get_component(male_a, &"CreatureComponent")
+	male_a_creature.is_alive = false
+
+	assert(not soc_fa.is_partner_alive(reg), "Male A is dead; is_partner_alive must return false")
+	var can_remarry: bool = mating_sys.can_mate(female_a, male_b)
+	assert(can_remarry, "Widowed creature must be permitted to mate with new suitor once partner is deceased")
+
+	var score_widow: float = mating_sys.calculate_trait_matching_score(female_a, male_b)
+	assert(score_widow >= 0.40, "Widow preference towards viable suitor must not suffer infidelity penalty (got %.2f)" % score_widow)
+
+	# 5. Promiscuous species (Hare with monogamy_tendency = 0.05)
+	var hare_ma: int = _CreatureFactory.create(
+		World, _CreatureTypes.Type.HARE, spawn_pos, "HareMaleA", [], -1, _CreatureTypes.Gender.MALE
+	)
+	var hare_fa: int = _CreatureFactory.create(
+		World, _CreatureTypes.Type.HARE, spawn_pos, "HareFemaleA", [], -1, _CreatureTypes.Gender.FEMALE
+	)
+	var hare_mb: int = _CreatureFactory.create(
+		World, _CreatureTypes.Type.HARE, spawn_pos + Vector2i(10, 10), "HareMaleB", [], -1, _CreatureTypes.Gender.MALE
+	)
+
+	var hare_fa_soc: _SocialComponent = reg.get_component(hare_fa, &"SocialComponent")
+	hare_fa_soc.bonded_partner_eid = hare_ma
+	# Promiscuous species does not block extra-pair mating
+	var hare_can_mate: bool = mating_sys.can_mate(hare_fa, hare_mb)
+	assert(hare_can_mate, "Promiscuous species (Hare) must allow extra-pair mating")
+
+	print("  -> PASSED: Pair-bond fidelity, monogamy level tendency, and partner preference verified.")
+
 func _write_log_artifact() -> void:
 	var path := "res://logs/test_creature_mating.log"
 	var file := FileAccess.open(path, FileAccess.WRITE)
@@ -337,4 +435,5 @@ func _write_log_artifact() -> void:
 		file.store_line("- Female creature carries data-driven spawnrate and fecundity.")
 		file.store_line("- MindEmbeddings mating drive & utility evaluation modulates libido behavior.")
 		file.store_line("- Full reproductive lifecycle (conception, gestation, birth, trait inheritance) verified.")
+		file.store_line("- Pair-bond fidelity & monogamy level tendency (0.0 to 1.0) and partner exclusivity verified.")
 		file.close()

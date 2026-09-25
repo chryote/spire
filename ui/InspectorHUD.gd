@@ -56,7 +56,17 @@ signal tile_deselected()
 @onready var creature_section: Control = $MainPanel/Margin/VBox/TabContainer/Creature/Margin/VBox/CreatureSection
 @onready var no_creature_vbox: Control = $MainPanel/Margin/VBox/TabContainer/Creature/Margin/VBox/NoCreatureVBox
 @onready var find_creature_btn: Button = $MainPanel/Margin/VBox/TabContainer/Creature/Margin/VBox/NoCreatureVBox/FindCreatureBtn
-@onready var snap_creature_btn: Button = get_node_or_null("MainPanel/Margin/VBox/TabContainer/Creature/Margin/VBox/CreatureSection/SnapCreatureBtn")
+@onready var snap_creature_btn: Button = _find_btn(["MainPanel/Margin/VBox/TabContainer/Creature/Margin/VBox/CreatureSection/SnapNavRow/SnapCreatureBtn", "MainPanel/Margin/VBox/TabContainer/Creature/Margin/VBox/CreatureSection/SnapCreatureBtn"])
+@onready var snap_other_creature_btn: Button = get_node_or_null("MainPanel/Margin/VBox/TabContainer/Creature/Margin/VBox/CreatureSection/SnapNavRow/SnapOtherCreatureBtn")
+@onready var prev_creature_btn: Button = get_node_or_null("MainPanel/Margin/VBox/TabContainer/Creature/Margin/VBox/CreatureSection/SnapNavRow/PrevCreatureBtn")
+@onready var snap_other_header_btn: Button = get_node_or_null("MainPanel/Margin/VBox/Header/SnapOtherHeaderBtn")
+
+func _find_btn(paths: Array) -> Button:
+	for p in paths:
+		var node = get_node_or_null(p)
+		if node is Button:
+			return node as Button
+	return null
 
 @onready var creature_header_label: Label = $MainPanel/Margin/VBox/TabContainer/Creature/Margin/VBox/CreatureSection/CreatureHeaderLabel
 @onready var creature_thought_label: RichTextLabel = $MainPanel/Margin/VBox/TabContainer/Creature/Margin/VBox/CreatureSection/CreatureThoughtLabel
@@ -130,6 +140,12 @@ func _ready() -> void:
 		find_creature_btn.pressed.connect(find_and_select_nearest_creature)
 	if snap_creature_btn != null:
 		snap_creature_btn.pressed.connect(_on_snap_creature_pressed)
+	if snap_other_creature_btn != null:
+		snap_other_creature_btn.pressed.connect(func(): snap_to_other_creature(true))
+	if prev_creature_btn != null:
+		prev_creature_btn.pressed.connect(func(): snap_to_other_creature(false))
+	if snap_other_header_btn != null:
+		snap_other_header_btn.pressed.connect(func(): snap_to_other_creature(true))
 
 	_setup_selection_box()
 
@@ -241,6 +257,23 @@ func snap_camera_to_tile(tile_pos: Vector2i) -> void:
 			if "_target_position" in cam:
 				cam._target_position = world_pos
 
+## Returns a sorted list of all alive creature entity IDs currently on the map.
+func get_all_alive_creatures() -> Array[int]:
+	var result: Array[int] = []
+	if World == null:
+		return result
+	var reg = World.get_registry()
+	if reg == null:
+		return result
+	var c_store: Dictionary = reg.get_store(&"CreatureComponent")
+	var p_store: Dictionary = reg.get_store(&"PositionComponent")
+	for ceid: int in c_store:
+		var c_comp: _CreatureComponent = c_store[ceid]
+		if c_comp != null and c_comp.is_alive and p_store.has(ceid):
+			result.append(ceid)
+	result.sort()
+	return result
+
 func _find_any_creature_pos() -> Vector2i:
 	return _find_nearest_creature_pos(Vector2i(64, 64))
 
@@ -248,12 +281,13 @@ func _find_nearest_creature_pos(ref_pos: Vector2i) -> Vector2i:
 	if World != null:
 		var reg = World.get_registry()
 		if reg != null:
-			var pos_store: Dictionary = reg.get_store(&"PositionComponent")
-			if not pos_store.is_empty():
+			var p_store: Dictionary = reg.get_store(&"PositionComponent")
+			var alive_creatures := get_all_alive_creatures()
+			if not alive_creatures.is_empty():
 				var best_pos := Vector2i(-1, -1)
 				var min_dist_sq: float = INF
-				for ceid: int in pos_store:
-					var cpos: Vector2i = pos_store[ceid].position
+				for ceid: int in alive_creatures:
+					var cpos: Vector2i = p_store[ceid].position
 					var d_sq: float = float((cpos.x - ref_pos.x) * (cpos.x - ref_pos.x) + (cpos.y - ref_pos.y) * (cpos.y - ref_pos.y))
 					if d_sq < min_dist_sq:
 						min_dist_sq = d_sq
@@ -287,6 +321,56 @@ func _on_snap_creature_pressed() -> void:
 				return
 	if selected_tile != Vector2i(-1, -1):
 		snap_camera_to_tile(selected_tile)
+
+## Snaps the camera and inspects the next or previous creature available on the map.
+func snap_to_other_creature(forward: bool = true) -> void:
+	var creatures := get_all_alive_creatures()
+	if creatures.is_empty():
+		return
+
+	var reg = World.get_registry()
+	if reg == null:
+		return
+	var p_store: Dictionary = reg.get_store(&"PositionComponent")
+
+	var target_eid: int = -1
+
+	if selected_creature_eid != -1 and creatures.has(selected_creature_eid):
+		if creatures.size() == 1:
+			target_eid = selected_creature_eid
+		else:
+			var cur_idx: int = creatures.find(selected_creature_eid)
+			var step: int = 1 if forward else -1
+			var next_idx: int = (cur_idx + step) % creatures.size()
+			if next_idx < 0:
+				next_idx += creatures.size()
+			target_eid = creatures[next_idx]
+	else:
+		# If no creature is currently inspected, find the closest creature to current camera/selection
+		var ref_pos := selected_tile
+		if ref_pos == Vector2i(-1, -1):
+			var cam := _get_camera()
+			if cam != null:
+				ref_pos = Vector2i(floori(cam.position.x / 18.0), floori(cam.position.y / 18.0))
+			else:
+				ref_pos = Vector2i(64, 64)
+
+		var best_eid: int = creatures[0]
+		var min_d_sq: float = INF
+		for ceid in creatures:
+			var cpos: Vector2i = p_store[ceid].position
+			var d_sq: float = float((cpos.x - ref_pos.x) * (cpos.x - ref_pos.x) + (cpos.y - ref_pos.y) * (cpos.y - ref_pos.y))
+			if d_sq < min_d_sq:
+				min_d_sq = d_sq
+				best_eid = ceid
+		target_eid = best_eid
+
+	if target_eid != -1 and p_store.has(target_eid):
+		var target_pos: Vector2i = p_store[target_eid].position
+		snap_camera_to_tile(target_pos)
+		inspect_tile(target_pos, target_eid)
+		if tab_container != null:
+			tab_container.current_tab = 1
 
 # ---------------------------------------------------------------------------
 # Inspection & Selection API
@@ -325,6 +409,7 @@ func deselect() -> void:
 	if main_panel != null:
 		main_panel.visible = false
 	_update_toggle_btn()
+	_update_creature_nav_buttons(null, -1)
 	tile_deselected.emit()
 
 # ---------------------------------------------------------------------------
@@ -357,6 +442,60 @@ func update_inspector() -> void:
 		selected_creature_eid = World.get_creature_at(selected_tile)
 
 	_render_creature(reg, selected_creature_eid)
+	_update_creature_nav_buttons(reg, selected_creature_eid)
+
+func _update_creature_nav_buttons(reg, ceid: int) -> void:
+	var all_creatures := get_all_alive_creatures()
+	var total: int = all_creatures.size()
+
+	# 1. Header Button
+	if snap_other_header_btn != null:
+		if total == 0:
+			snap_other_header_btn.text = "🐾 NO CREATURES"
+			snap_other_header_btn.disabled = true
+			snap_other_header_btn.tooltip_text = "No living creatures found on the map."
+		elif total == 1 and ceid == all_creatures[0]:
+			snap_other_header_btn.text = "🐾 1 CREATURE"
+			snap_other_header_btn.disabled = true
+			snap_other_header_btn.tooltip_text = "Only 1 creature on the map (already selected)."
+		elif ceid != -1 and all_creatures.has(ceid):
+			var cur_i: int = all_creatures.find(ceid)
+			snap_other_header_btn.text = "🐾 OTHER (%d/%d)" % [cur_i + 1, total]
+			snap_other_header_btn.disabled = false
+			snap_other_header_btn.tooltip_text = "Snap camera to other creature on the map (%d total)." % total
+		else:
+			snap_other_header_btn.text = "🐾 CREATURE (%d)" % total
+			snap_other_header_btn.disabled = false
+			snap_other_header_btn.tooltip_text = "Snap camera to nearest creature on the map."
+
+	# 2. Creature Section Nav Buttons
+	if snap_other_creature_btn != null:
+		if total > 1:
+			var cur_idx: int = all_creatures.find(ceid)
+			var next_idx: int = (cur_idx + 1) % total if cur_idx != -1 else 0
+			var next_eid: int = all_creatures[next_idx]
+			var next_c: _CreatureComponent = reg.get_component(next_eid, &"CreatureComponent") if reg != null else null
+			var next_name: String = next_c.creature_name if next_c != null else "Creature"
+			snap_other_creature_btn.text = "🐾 OTHER: %s ▶" % next_name
+			snap_other_creature_btn.disabled = false
+			snap_other_creature_btn.tooltip_text = "Snap to next creature: %s (eid=%d, %d/%d)" % [next_name, next_eid, next_idx + 1, total]
+		else:
+			snap_other_creature_btn.text = "🐾 NO OTHER CREATURE"
+			snap_other_creature_btn.disabled = true
+			snap_other_creature_btn.tooltip_text = "Only 1 creature exists on the map."
+
+	if prev_creature_btn != null:
+		prev_creature_btn.disabled = (total <= 1)
+		prev_creature_btn.tooltip_text = "Snap to previous creature on the map." if total > 1 else "Only 1 creature on map."
+
+	# 3. NoCreature notice button
+	if find_creature_btn != null:
+		if total > 0:
+			find_creature_btn.text = "🔎 FIND NEAREST CREATURE (%d AVAILABLE)" % total
+			find_creature_btn.disabled = false
+		else:
+			find_creature_btn.text = "🔎 NO CREATURES ON MAP"
+			find_creature_btn.disabled = true
 
 # ---------------------------------------------------------------------------
 # Environment Rendering
@@ -560,10 +699,20 @@ func _render_creature(reg, ceid: int) -> void:
 		else:
 			repro_str = " (Spawnrate: %.2f)" % mating_comp.spawn_rate
 
+	var social_comp = reg.get_component(ceid, &"SocialComponent")
+	var social_str: String = ""
+	if social_comp != null:
+		if social_comp.has_bonded_partner():
+			var partner_alive: bool = social_comp.is_partner_alive(reg)
+			var status_tag: String = "Alive" if partner_alive else "Dead"
+			social_str += " [Mate: #%d (%s)]" % [social_comp.bonded_partner_eid, status_tag]
+		if social_comp.has_mother():
+			social_str += " [Mother: #%d]" % social_comp.mother_eid
+
 	if creature_header_label != null:
 		var diet_name: String = _DietTypes.get_category_name(creature.diet)
-		creature_header_label.text = "%s \"%s\" (eid=%d)%s%s [%s]%s — %s (Age: %d)" % [
-			species_name, creature.creature_name, ceid, gender_str, stage_str, diet_name, repro_str, status_str, creature.age_ticks
+		creature_header_label.text = "%s \"%s\" (eid=%d)%s%s [%s]%s%s — %s (Age: %d)" % [
+			species_name, creature.creature_name, ceid, gender_str, stage_str, diet_name, repro_str, social_str, status_str, creature.age_ticks
 		]
 
 	# --- Thought & Action ---
@@ -617,6 +766,14 @@ func _render_creature(reg, ceid: int) -> void:
 				else:
 					thought_text = "Seeking compatible partner with desirable traits (mating drive: %.0f%%)." % [
 						mind.mating * 100.0 if mind != null else 50.0
+					]
+			_MindEmbeddings.Action.SOCIALIZE:
+				act_name = "SOCIALIZE"
+				if plan.target_tile == selected_tile or plan.path_queue.is_empty():
+					thought_text = "Grazing comfortably alongside companions in the herd."
+				else:
+					thought_text = "Moving closer to companions to stay with the herd (sociability: %.0f%%)." % [
+						mind.sociability * 100.0 if mind != null else 50.0
 					]
 			_MindEmbeddings.Action.IDLE:
 				act_name = "IDLE"
@@ -729,6 +886,19 @@ func _render_creature(reg, ceid: int) -> void:
 				t_lines.append(effects_str)
 			else:
 				t_lines.append("[b]Status Effects:[/b] [color=#888888]No active buffs/debuffs[/color]")
+
+			var sc = reg.get_component(ceid, &"SocialComponent")
+			if sc != null:
+				var partner_info: String = "None"
+				if sc.has_bonded_partner():
+					var partner_alive: bool = sc.is_partner_alive(reg)
+					partner_info = "#%d (%s)" % [sc.bonded_partner_eid, "Alive" if partner_alive else "Deceased"]
+				t_lines.append("[b]Social Dynamics:[/b] Sociality: [color=#87cefa]%.0f%%[/color] | Fidelity: [color=#ffb6c1]%.0f%%[/color] | Kinship: [color=#98fb98]%.0f%%[/color] | Partner: [color=#ffd700]%s[/color]" % [
+					sc.sociality * 100.0,
+					sc.monogamy_tendency * 100.0,
+					sc.kinship_tendency * 100.0,
+					partner_info
+				])
 
 			creature_traits_label.text = "\n".join(t_lines)
 		else:

@@ -273,7 +273,44 @@ func _test_camera_pause_and_creature_snap() -> void:
 	_inspector._on_snap_creature_pressed()
 	assert(_camera.position == expected_world_pos, "Snap button in CreatureSection MUST re-snap camera to creature")
 
-	print("  -> PASSED: Camera movement auto-pauses simulation and Inspector HUD snaps camera to creatures.")
+	# 6. Test Snap to Other Creature available on map
+	var other_creature_tile := Vector2i(70, 70)
+	var ceid_other := _CreatureFactory.create(World, _CreatureTypes.Type.GRAZER, other_creature_tile, "Companion")
+	assert(ceid_other != -1, "Second creature creation succeeded")
+
+	_inspector.update_inspector()
+	assert(_inspector.snap_other_creature_btn != null, "SnapOtherCreatureBtn must exist")
+	assert(not _inspector.snap_other_creature_btn.disabled, "SnapOtherCreatureBtn should be enabled when multiple creatures exist")
+	assert(_inspector.snap_other_creature_btn.text.contains("Companion"), "Button should show next companion name")
+
+	# Currently inspecting Tracker at (42, 42)
+	assert(_inspector.selected_creature_eid == ceid, "Tracker currently selected")
+
+	# Click snap to other creature
+	_inspector.snap_to_other_creature(true)
+	var expected_other_world_pos := Vector2(other_creature_tile.x * 18.0 + 9.0, other_creature_tile.y * 18.0 + 9.0)
+	assert(_inspector.selected_creature_eid == ceid_other, "Should switch inspection to Companion")
+	assert(_inspector.selected_tile == other_creature_tile, "Selected tile should be at Companion position")
+	assert(_camera.position == expected_other_world_pos, "Camera MUST snap directly to other creature world coordinates")
+
+	# Test stepping forward and backward
+	var all_c: Array[int] = _inspector.get_all_alive_creatures()
+	var cur_idx: int = all_c.find(ceid_other)
+	var next_expected_eid: int = all_c[(cur_idx + 1) % all_c.size()]
+
+	_inspector.snap_to_other_creature(true)
+	assert(_inspector.selected_creature_eid == next_expected_eid, "Cycling forward should select next creature in list")
+
+	# Test stepping backward
+	_inspector.snap_to_other_creature(false)
+	assert(_inspector.selected_creature_eid == ceid_other, "Cycling backward should return to Companion")
+
+	# Test Header snap button
+	assert(_inspector.snap_other_header_btn != null, "SnapOtherHeaderBtn must exist in Header")
+	_inspector.snap_other_header_btn.emit_signal("pressed")
+	assert(_inspector.selected_creature_eid == next_expected_eid, "Header snap button must cycle forward to next creature")
+
+	print("  -> PASSED: Camera movement auto-pauses simulation and Inspector HUD snaps to creatures and other map peers.")
 
 func _save_test_log() -> void:
 	var file = FileAccess.open("res://logs/test_inspector_hud.log", FileAccess.WRITE)

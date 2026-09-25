@@ -13,6 +13,7 @@ const _MindComponent     = preload("res://modules/creature/components/mind/MindC
 const _MemoryComponent   = preload("res://modules/creature/components/mind/MemoryComponent.gd")
 const _TraitComponent    = preload("res://modules/creature/components/TraitComponent.gd")
 const _MatingComponent   = preload("res://modules/creature/components/MatingComponent.gd")
+const _SocialComponent   = preload("res://modules/creature/components/SocialComponent.gd")
 const _GrowthComponent   = preload("res://modules/creature/components/GrowthComponent.gd")
 const _CreatureTypes     = preload("res://modules/creature/data/CreatureTypes.gd")
 const _TraitTypes        = preload("res://modules/creature/data/TraitTypes.gd")
@@ -162,6 +163,19 @@ func calculate_trait_matching_score(evaluator_eid: int, candidate_eid: int) -> f
 	# 7. General health factor
 	score *= (0.6 + cand_creature.health * 0.4)
 
+	# 8. Pair-Bond Fidelity & Monogamy Preference
+	var social_store: Dictionary = reg.get_store(&"SocialComponent")
+	var eval_social: _SocialComponent = social_store.get(evaluator_eid, null)
+	if eval_social != null:
+		if candidate_eid == eval_social.bonded_partner_eid:
+			# Loyalty bonus to bonded partner scaled by monogamy tendency
+			score += 0.35 * eval_social.monogamy_tendency
+		elif eval_social.has_bonded_partner() and eval_social.is_partner_alive(reg):
+			# Infidelity aversion penalty scaled by monogamy tendency
+			score -= 0.80 * eval_social.monogamy_tendency
+			if eval_social.monogamy_tendency >= 0.70:
+				score = 0.0
+
 	return clampf(score, 0.0, 1.0)
 
 ## Validates whether two creatures can physically and biologically mate.
@@ -216,7 +230,47 @@ func can_mate(eid_a: int, eid_b: int) -> bool:
 	if not ma.is_ready_to_mate() or not mb.is_ready_to_mate():
 		return false
 
+	# Pair-Bond Fidelity / Monogamy checks: reject extra-pair mating if faithful to living partner
+	if _is_bonded_and_faithful_to_other(eid_a, eid_b, reg):
+		return false
+	if _is_bonded_and_faithful_to_other(eid_b, eid_a, reg):
+		return false
+
 	return true
+
+## Checks whether a creature has an alive bonded partner and is socially/biologically
+## faithful enough to reject mating with an outside candidate.
+func _is_bonded_and_faithful_to_other(eid: int, candidate_eid: int, reg) -> bool:
+	if reg == null:
+		return false
+	var social_store: Dictionary = reg.get_store(&"SocialComponent")
+	var social: _SocialComponent = social_store.get(eid, null)
+	if social == null or not social.has_bonded_partner():
+		return false
+
+	# Mating with own bonded partner is always allowed
+	if social.bonded_partner_eid == candidate_eid:
+		return false
+
+	# If bonded partner is deceased, creature is free to mate
+	if not social.is_partner_alive(reg):
+		return false
+
+	# 1. High fidelity (monogamy_tendency >= 0.70): strict lifetime fidelity, blocks outside suitor
+	if social.monogamy_tendency >= 0.70:
+		return true
+
+	# 2. Moderate fidelity (monogamy_tendency >= 0.35): faithful if partner is alive and nearby within social radius
+	if social.monogamy_tendency >= 0.35 and world != null:
+		var pos_store: Dictionary = reg.get_store(&"PositionComponent")
+		var my_pos: _PositionComponent = pos_store.get(eid, null)
+		var partner_pos: _PositionComponent = pos_store.get(social.bonded_partner_eid, null)
+		if my_pos != null and partner_pos != null:
+			var dist: float = my_pos.position.distance_to(partner_pos.position)
+			if dist <= float(social.social_radius):
+				return true
+
+	return false
 
 ## Attempts physical mating between two creatures with mutual trait preference evaluation.
 func attempt_mating(eid_a: int, eid_b: int) -> bool:
@@ -269,6 +323,28 @@ func attempt_mating(eid_a: int, eid_b: int) -> bool:
 		male_mind.mating = 0.0
 	if female_mind != null:
 		female_mind.mating = 0.0
+
+	# Pair Bonding Evaluation based on pair_bond_tendency & monogamy_tendency
+	var male_social: _SocialComponent = reg.get_component(male_eid, &"SocialComponent")
+	var female_social: _SocialComponent = reg.get_component(female_eid, &"SocialComponent")
+	if male_social != null and female_social != null:
+		# If already bonded to each other, bond is reinforced
+		if male_social.bonded_partner_eid == female_eid and female_social.bonded_partner_eid == male_eid:
+			pass
+		else:
+			# Preserve existing living bonds: an individual will only form a new bond
+			# if they have no living partner, or if their monogamy tendency is very low (< 0.20)
+			var male_has_living_partner: bool = male_social.has_bonded_partner() and male_social.is_partner_alive(reg)
+			var female_has_living_partner: bool = female_social.has_bonded_partner() and female_social.is_partner_alive(reg)
+
+			var male_open: bool = not male_has_living_partner or (male_social.monogamy_tendency < 0.20 and randf() > male_social.monogamy_tendency)
+			var female_open: bool = not female_has_living_partner or (female_social.monogamy_tendency < 0.20 and randf() > female_social.monogamy_tendency)
+
+			if male_open and female_open:
+				var bond_prob: float = (male_social.pair_bond_tendency + female_social.pair_bond_tendency) * 0.5
+				if randf() < bond_prob:
+					male_social.bonded_partner_eid = female_eid
+					female_social.bonded_partner_eid = male_eid
 
 	var mate_pos: Vector2i = pos_comp.position if pos_comp != null else Vector2i.ZERO
 	if world.signals != null:
@@ -341,6 +417,16 @@ func _give_birth(
 		)
 		if child_eid != -1:
 			female_mating.total_offspring_spawned += 1
+			# Establish Kinship Bond between mother and offspring
+			if world != null:
+				var reg = world.get_registry()
+				if reg != null:
+					var mother_social: _SocialComponent = reg.get_component(mother_eid, &"SocialComponent")
+					var child_social: _SocialComponent  = reg.get_component(child_eid, &"SocialComponent")
+					if child_social != null:
+						child_social.mother_eid = mother_eid
+					if mother_social != null:
+						mother_social.add_offspring(child_eid)
 
 	female_mating.is_pregnant = false
 	female_mating.gestation_ticks = 0

@@ -66,7 +66,7 @@ func tick(tick_number: int) -> void:
 				# Cooldown modified by leg mobility and traits
 				var interval: int = pos_comp.base_move_interval
 				if traits != null:
-					interval += traits.get_stat_offset(&"move_cooldown")
+					interval += int(traits.get_stat_offset(&"move_cooldown"))
 				if creature.mobility_factor < 0.99:
 					interval = int(float(interval) / maxf(0.2, creature.mobility_factor))
 				pos_comp.move_cooldown_ticks = maxi(1, interval)

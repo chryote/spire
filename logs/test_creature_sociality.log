@@ -1,0 +1,7 @@
+PASSED: Creature Sociality & Pack Formation Integration Verified.
+- Data-driven species sociality profiles (Grazer=0.85, Deer=0.60, Hare=0.25) active.
+- Genetic traits (Gregarious, Solitary) modulate individual social tendencies.
+- Sociability drive dynamics enforce isolation loneliness vs. herd satisfaction.
+- Action.SOCIALIZE utility selection and companion approach planning verified.
+- Emergent Boids-style herd cohesion steering guides wander towards herd centroid.
+- Kinship bonding and juvenile mother-shadowing verified.

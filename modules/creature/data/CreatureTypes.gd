@@ -82,6 +82,15 @@ const DATA: Dictionary = {
 			"gestation_duration": 600,       # ticks required to give birth
 			"mating_cooldown":    1200,      # refractory ticks before mating again
 		},
+		"social": {
+			"sociality":          0.85,      # obligate herd grazer
+			"pair_bond_tendency": 0.40,
+			"monogamy_tendency":   0.70,      # high fidelity to bonded partner
+			"kinship_tendency":   0.80,
+			"social_radius":      12,
+			"comfort_dist_min":   2,
+			"comfort_dist_max":   6,
+		},
 		"anatomy": {
 			"limbs": {
 				"head":          { "volume": 0.0025, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.0 },
@@ -177,6 +186,15 @@ const DATA: Dictionary = {
 			"litter_size_max":    5,
 			"gestation_duration": 300,       # short gestation
 			"mating_cooldown":    600,
+		},
+		"social": {
+			"sociality":          0.25,      # mostly solitary / loose opportunistic
+			"pair_bond_tendency": 0.15,
+			"monogamy_tendency":   0.05,      # highly promiscuous r-strategist breeder
+			"kinship_tendency":   0.50,
+			"social_radius":      8,
+			"comfort_dist_min":   3,
+			"comfort_dist_max":   10,
 		},
 		"anatomy": {
 			"limbs": {
@@ -274,6 +292,15 @@ const DATA: Dictionary = {
 			"gestation_duration": 900,       # long gestation
 			"mating_cooldown":    1800,
 		},
+		"social": {
+			"sociality":          0.60,      # loose foraging herd
+			"pair_bond_tendency": 0.30,
+			"monogamy_tendency":   0.30,      # polygynous / low-moderate fidelity
+			"kinship_tendency":   0.70,
+			"social_radius":      14,
+			"comfort_dist_min":   3,
+			"comfort_dist_max":   8,
+		},
 		"anatomy": {
 			"limbs": {
 				"head":          { "volume": 0.006, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.0 },
@@ -350,4 +377,8 @@ static func get_gender_name(gender: int) -> String:
 		Gender.FEMALE: return "Female"
 		Gender.MALE:   return "Male"
 		_:             return "Unknown"
+
+static func get_social_profile(species_type: int) -> Dictionary:
+	var d: Dictionary = get_data(species_type)
+	return d.get("social", {})
 

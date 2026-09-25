@@ -16,33 +16,46 @@ const _PerformanceDiagnostics = preload("res://modules/diagnostics/PerformanceDi
 const _CreatureFactory        = preload("res://modules/creature/systems/CreatureFactory.gd")
 const _CreatureTypes          = preload("res://modules/creature/data/CreatureTypes.gd")
 const _TileAffordance         = preload("res://modules/signal/data/TileAffordance.gd")
+const _CreatureSpawner        = preload("res://modules/creature/systems/CreatureSpawner.gd")
 
 var _diag: _PerformanceDiagnostics = null
+
+## Optional configuration list for starter creatures.
+## When empty, defaults to _CreatureSpawner.DEFAULT_STARTER_CONFIGS (Male & Female Grazer).
+var starter_creature_configs: Array[Dictionary] = []
 
 func _ready() -> void:
 	_diag = _PerformanceDiagnostics.new()
 	add_child(_diag)
 	_diag.start_profiling()
-	_spawn_starter_creature.call_deferred()
+	_spawn_starter_creatures.call_deferred()
 
+# ---------------------------------------------------------------------------
+# Extensible Creature Spawning Helpers
+# ---------------------------------------------------------------------------
+
+## Spawns starter creatures into the simulation using the extensible CreatureSpawner helper.
+## Defaults to a male and female Grazer pair if no custom configs are provided.
+func spawn_starter_creatures(configs: Array = []) -> Array[int]:
+	var active_configs: Array = configs
+	if active_configs.is_empty():
+		active_configs = starter_creature_configs if not starter_creature_configs.is_empty() else _CreatureSpawner.DEFAULT_STARTER_CONFIGS
+	return _CreatureSpawner.spawn_starter_creatures(World, active_configs)
+
+## Backward-compatibility helper for legacy single-creature starter invocation.
 func _spawn_starter_creature() -> void:
-	var reg = World.get_registry()
-	if reg == null:
-		return
-	var veg_store: Dictionary  = reg.get_store(&"VegetationComponent")
-	var tile_store: Dictionary = reg.get_store(&"TileComponent")
-	var spawn_pos := Vector2i(-1, -1)
-	for eid: int in veg_store:
-		var tile = tile_store.get(eid, null)
-		if tile != null and tile.position.y >= 65 and tile.position.y <= 95:
-			if World.signals != null and World.signals.has_affordance(tile.position, _TileAffordance.WALKABLE):
-				if not World.signals.has_affordance(tile.position, _TileAffordance.HAZARD_LETHAL):
-					spawn_pos = tile.position
-					break
-	if spawn_pos == Vector2i(-1, -1):
-		spawn_pos = Vector2i(64, 80)
-	var creature_eid: int = _CreatureFactory.create(World, _CreatureTypes.Type.GRAZER, spawn_pos, "Grazer")
-	print("[Spire] Spawned starter grazer creature (eid=%d) at %s." % [creature_eid, spawn_pos])
+	spawn_starter_creatures()
+
+func _spawn_starter_creatures() -> void:
+	spawn_starter_creatures()
+
+## Extensible helper to spawn a single creature from configuration.
+func spawn_creature(config: Dictionary, excluded_positions: Array[Vector2i] = []) -> int:
+	return _CreatureSpawner.spawn_creature(World, config, excluded_positions)
+
+## Extensible helper to search and return a valid spawn position in the world.
+func find_spawn_position(criteria: Dictionary = {}, excluded_positions: Array[Vector2i] = []) -> Vector2i:
+	return _CreatureSpawner.find_spawn_position(World, criteria, excluded_positions)
 
 func _input(event: InputEvent) -> void:
 	if not (event is InputEventKey) or not (event as InputEventKey).pressed:

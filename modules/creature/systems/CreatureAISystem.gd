@@ -19,6 +19,7 @@ const _TraitComponent      = preload("res://modules/creature/components/TraitCom
 const _SignalTypes         = preload("res://modules/signal/data/SignalTypes.gd")
 const _TileAffordance      = preload("res://modules/signal/data/TileAffordance.gd")
 const _DietTypes           = preload("res://modules/matter/data/DietTypes.gd")
+const _SocialComponent     = preload("res://modules/creature/components/SocialComponent.gd")
 
 func initialize() -> void:
 	print("[CreatureAISystem] Initialized. Priority 230.")
@@ -37,6 +38,7 @@ func tick(tick_number: int) -> void:
 	var mem_store: Dictionary      = reg.get_store(&"MemoryComponent")
 	var plan_store: Dictionary     = reg.get_store(&"ActionPlanComponent")
 	var trait_store: Dictionary    = reg.get_store(&"TraitComponent")
+	var social_store: Dictionary   = reg.get_store(&"SocialComponent")
 
 	for eid: int in creature_store:
 		var creature: _CreatureComponent = creature_store[eid]
@@ -48,6 +50,7 @@ func tick(tick_number: int) -> void:
 		var mem: _MemoryComponent        = mem_store.get(eid, null)
 		var plan: _ActionPlanComponent   = plan_store.get(eid, null)
 		var traits: _TraitComponent      = trait_store.get(eid, null)
+		var social: _SocialComponent     = social_store.get(eid, null)
 
 		if pos_comp == null or mind == null or plan == null:
 			continue
@@ -58,6 +61,9 @@ func tick(tick_number: int) -> void:
 		# 1. Environmental Perception via SignalSystem
 		# -------------------------------------------------------------------
 		var sig_data: Dictionary = world.signals.get_signals_at(cur_pos, 0.01)
+		# Merge dynamic social perception flags from SocialSystem
+		for k in mind.perceived_signals:
+			sig_data[k] = mind.perceived_signals[k]
 		mind.perceived_signals = sig_data
 
 		var hazard_sens: float = traits.get_stat_multiplier(&"hazard_sensitivity", 1.0) if traits != null else 1.0
@@ -81,6 +87,7 @@ func tick(tick_number: int) -> void:
 			_MindEmbeddings.Action.DRINK,
 			_MindEmbeddings.Action.REST,
 			_MindEmbeddings.Action.MATE,
+			_MindEmbeddings.Action.SOCIALIZE,
 			_MindEmbeddings.Action.WANDER,
 			_MindEmbeddings.Action.IDLE
 		]:
@@ -109,7 +116,10 @@ func tick(tick_number: int) -> void:
 				_plan_flee(cur_pos, plan)
 
 			_MindEmbeddings.Action.WANDER:
-				_plan_wander(cur_pos, plan, pos_comp, mem, tick_number)
+				_plan_wander(cur_pos, plan, pos_comp, mem, tick_number, social, mind)
+
+			_MindEmbeddings.Action.SOCIALIZE:
+				_plan_socialize(cur_pos, plan, eid, pos_comp, mem, social, mind, tick_number)
 
 			_MindEmbeddings.Action.REST:
 				_plan_rest(cur_pos, plan, mem, tick_number)
@@ -118,7 +128,7 @@ func tick(tick_number: int) -> void:
 				_plan_attack(cur_pos, plan, pos_comp)
 
 			_MindEmbeddings.Action.MATE:
-				_plan_mate(cur_pos, plan, eid, pos_comp, mem, tick_number)
+				_plan_mate(cur_pos, plan, eid, pos_comp, mem, tick_number, social)
 
 			_MindEmbeddings.Action.IDLE:
 				plan.clear_path()
@@ -320,7 +330,15 @@ func _plan_flee(cur_pos: Vector2i, plan: _ActionPlanComponent) -> void:
 		plan.target_tile = target
 		plan.path_queue = [target]
 
-func _plan_wander(cur_pos: Vector2i, plan: _ActionPlanComponent, pos_comp: _PositionComponent, mem: _MemoryComponent, tick_number: int) -> void:
+func _plan_wander(
+	cur_pos: Vector2i,
+	plan: _ActionPlanComponent,
+	pos_comp: _PositionComponent,
+	mem: _MemoryComponent,
+	tick_number: int,
+	social: _SocialComponent = null,
+	mind: _MindComponent = null
+) -> void:
 	if not plan.path_queue.is_empty():
 		return
 
@@ -332,13 +350,57 @@ func _plan_wander(cur_pos: Vector2i, plan: _ActionPlanComponent, pos_comp: _Posi
 		cur_pos - pos_comp.facing,
 	]
 
+	var best_tile := Vector2i(-1, -1)
+	var best_score: float = -999.0
+
 	for next_pos in candidates:
-		if world.is_valid_position(next_pos) and world.signals.has_affordance(next_pos, _TileAffordance.WALKABLE):
-			if mem != null and mem.was_recently_at(next_pos, 8, tick_number):
-				continue
-			plan.target_tile = next_pos
-			plan.path_queue = [next_pos]
-			return
+		if not world.is_valid_position(next_pos) or not world.signals.has_affordance(next_pos, _TileAffordance.WALKABLE):
+			continue
+		if world.signals.has_affordance(next_pos, _TileAffordance.HAZARD_LETHAL):
+			continue
+		if world.get_creature_at(next_pos) != -1:
+			continue
+
+		var score: float = 0.0
+
+		# Forward momentum
+		if next_pos == cur_pos + pos_comp.facing:
+			score += 1.0
+		elif next_pos == cur_pos - pos_comp.facing:
+			score -= 0.5
+
+		# Short-term memory avoidance
+		if mem != null and mem.was_recently_at(next_pos, 8, tick_number):
+			score -= 3.0
+
+		# Emergent herd cohesion bias
+		if social != null and social.herd_centroid != Vector2.ZERO and social.sociality > 0.25:
+			var cur_dist_c: float = Vector2(cur_pos).distance_to(social.herd_centroid)
+			var next_dist_c: float = Vector2(next_pos).distance_to(social.herd_centroid)
+			var soc_drive: float = mind.sociability if mind != null else 0.5
+
+			if next_dist_c < cur_dist_c:
+				score += 2.0 * social.sociality * (0.5 + soc_drive * 0.5)
+			else:
+				if cur_dist_c > float(social.comfort_dist_max):
+					score -= 3.0 * social.sociality
+
+			# Juvenile following mother bias
+			if social.has_mother():
+				var mother_pos = _get_creature_position(social.mother_eid)
+				if mother_pos != Vector2i(-1, -1):
+					var cur_m_dist: float = Vector2(cur_pos).distance_to(Vector2(mother_pos))
+					var next_m_dist: float = Vector2(next_pos).distance_to(Vector2(mother_pos))
+					if next_m_dist < cur_m_dist:
+						score += 3.5 * social.kinship_tendency
+
+		if score > best_score:
+			best_score = score
+			best_tile = next_pos
+
+	if best_tile != Vector2i(-1, -1):
+		plan.target_tile = best_tile
+		plan.path_queue = [best_tile]
 
 func _plan_rest(cur_pos: Vector2i, plan: _ActionPlanComponent, mem: _MemoryComponent, tick_number: int) -> void:
 	# 1. If current tile already provides COVER, stay and rest right here!
@@ -450,11 +512,12 @@ func _plan_mate(
 	eid: int,
 	pos_comp: _PositionComponent,
 	mem: _MemoryComponent,
-	tick_number: int
+	tick_number: int,
+	social: _SocialComponent = null
 ) -> void:
 	var reg = world.get_registry()
 	if reg == null or world.mating_system == null:
-		_plan_wander(cur_pos, plan, pos_comp, mem, tick_number)
+		_plan_wander(cur_pos, plan, pos_comp, mem, tick_number, social)
 		return
 
 	var pos_store: Dictionary = reg.get_store(&"PositionComponent")
@@ -473,31 +536,45 @@ func _plan_mate(
 		if target_eid != -1 and mating_sys.can_mate(eid, target_eid):
 			return
 
-	# 3. Search for the best mating candidate using trait matching preferences
+	# 3. Search for mating candidates
 	var best_candidate: int = -1
 	var best_pos := Vector2i(-1, -1)
 	var best_score: float = -999.0
 
-	for cand_eid: int in pos_store:
-		if cand_eid == eid:
-			continue
+	# Pair-Bond Priority: If creature has an alive bonded partner, target them first!
+	if social != null and social.has_bonded_partner() and social.is_partner_alive(reg):
+		var partner_eid: int = social.bonded_partner_eid
+		var partner_pos_c: _PositionComponent = pos_store.get(partner_eid, null)
+		if partner_pos_c != null:
+			if mating_sys.can_mate(eid, partner_eid):
+				best_candidate = partner_eid
+				best_pos = partner_pos_c.position
+			elif social.monogamy_tendency >= 0.70:
+				# High monogamy: refuse to pursue outside suitors; navigate towards partner
+				best_candidate = partner_eid
+				best_pos = partner_pos_c.position
 
-		var cand_pos: Vector2i = pos_store[cand_eid].position
-		var dist: float = cur_pos.distance_to(cand_pos)
-		if dist > 16.0:
-			continue
+	if best_candidate == -1:
+		for cand_eid: int in pos_store:
+			if cand_eid == eid:
+				continue
 
-		if not mating_sys.can_mate(eid, cand_eid):
-			continue
+			var cand_pos: Vector2i = pos_store[cand_eid].position
+			var dist: float = cur_pos.distance_to(cand_pos)
+			if dist > 16.0:
+				continue
 
-		# Trait matching preference score [0.0, 1.0]
-		var pref: float = mating_sys.calculate_trait_matching_score(eid, cand_eid)
-		# Score balances trait preference and distance
-		var score: float = (pref * 3.0) - (dist * 0.10)
-		if score > best_score:
-			best_score = score
-			best_candidate = cand_eid
-			best_pos = cand_pos
+			if not mating_sys.can_mate(eid, cand_eid):
+				continue
+
+			# Trait matching preference score [0.0, 1.0]
+			var pref: float = mating_sys.calculate_trait_matching_score(eid, cand_eid)
+			# Score balances trait preference and distance
+			var score: float = (pref * 3.0) - (dist * 0.10)
+			if score > best_score:
+				best_score = score
+				best_candidate = cand_eid
+				best_pos = cand_pos
 
 	# 4. Check long-term memory for remembered mate encounter if none found nearby
 	if best_candidate == -1 and mem != null:
@@ -518,5 +595,116 @@ func _plan_mate(
 		if mem != null:
 			mem.remember_landmark(best_pos, &"mate", 1.0, tick_number)
 	else:
-		_plan_wander(cur_pos, plan, pos_comp, mem, tick_number)
+		_plan_wander(cur_pos, plan, pos_comp, mem, tick_number, social)
+
+# ---------------------------------------------------------------------------
+# Socializing Action Planning
+# ---------------------------------------------------------------------------
+
+func _plan_socialize(
+	cur_pos: Vector2i,
+	plan: _ActionPlanComponent,
+	_eid: int,
+	pos_comp: _PositionComponent,
+	mem: _MemoryComponent,
+	social: _SocialComponent,
+	mind: _MindComponent,
+	tick_number: int
+) -> void:
+	if social == null:
+		_plan_wander(cur_pos, plan, pos_comp, mem, tick_number, social, mind)
+		return
+
+	var reg = world.get_registry()
+	if reg == null:
+		return
+
+	var pos_store: Dictionary = reg.get_store(&"PositionComponent")
+
+	# 1. Determine highest priority companion (Partner > Mother > Closest Peer > Centroid)
+	var target_eid: int = -1
+	var target_pos := Vector2i(-1, -1)
+
+	if social.has_bonded_partner():
+		var p_pos = pos_store.get(social.bonded_partner_eid, null)
+		if p_pos != null and Vector2(cur_pos).distance_to(Vector2(p_pos.position)) <= float(social.social_radius):
+			target_eid = social.bonded_partner_eid
+			target_pos = p_pos.position
+
+	if target_eid == -1 and social.has_mother():
+		var m_pos = pos_store.get(social.mother_eid, null)
+		if m_pos != null and Vector2(cur_pos).distance_to(Vector2(m_pos.position)) <= float(social.social_radius):
+			target_eid = social.mother_eid
+			target_pos = m_pos.position
+
+	if target_eid == -1 and social.closest_peer_eid != -1:
+		var c_pos = pos_store.get(social.closest_peer_eid, null)
+		if c_pos != null:
+			target_eid = social.closest_peer_eid
+			target_pos = c_pos.position
+
+	if target_pos == Vector2i(-1, -1) and social.herd_centroid != Vector2.ZERO:
+		target_pos = Vector2i(roundi(social.herd_centroid.x), roundi(social.herd_centroid.y))
+
+	if target_pos == Vector2i(-1, -1):
+		_plan_wander(cur_pos, plan, pos_comp, mem, tick_number, social, mind)
+		return
+
+	var dist: float = Vector2(cur_pos).distance_to(Vector2(target_pos))
+
+	# 2. If already in intimate social comfort range (1 to comfort_dist_min), stay nearby and face companion
+	if dist >= 1.0 and dist <= float(social.comfort_dist_min):
+		plan.clear_path()
+		var dir_to: Vector2 = (Vector2(target_pos) - Vector2(cur_pos)).normalized()
+		pos_comp.facing = Vector2i(roundi(dir_to.x), roundi(dir_to.y))
+		return
+
+	# If overlapping on exact same tile, perform separation step
+	if dist < 1.0:
+		var away_dirs: Array[Vector2i] = [Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]
+		away_dirs.shuffle()
+		for d in away_dirs:
+			var step: Vector2i = cur_pos + d
+			if world.is_valid_position(step) and world.signals.has_affordance(step, _TileAffordance.WALKABLE) and world.get_creature_at(step) == -1:
+				plan.target_tile = step
+				plan.path_queue = [step]
+				return
+
+	# 3. Pathfind toward comfort ring around companion
+	var approach_tiles: Array[Vector2i] = _find_approach_tiles_around(target_pos, social.comfort_dist_min)
+	if approach_tiles.is_empty():
+		approach_tiles = _find_approach_tiles_around(target_pos, 1)
+
+	var best_app := Vector2i(-1, -1)
+	var min_app_d: float = 999.0
+
+	for app in approach_tiles:
+		if world.is_valid_position(app) and world.signals.has_affordance(app, _TileAffordance.WALKABLE) and world.get_creature_at(app) == -1:
+			var d: float = Vector2(cur_pos).distance_to(Vector2(app))
+			if d < min_app_d:
+				min_app_d = d
+				best_app = app
+
+	if best_app != Vector2i(-1, -1):
+		plan.target_tile = best_app
+		plan.path_queue = _build_simple_path(cur_pos, best_app)
+	else:
+		_plan_wander(cur_pos, plan, pos_comp, mem, tick_number, social, mind)
+
+func _get_creature_position(target_eid: int) -> Vector2i:
+	if world == null or target_eid == -1:
+		return Vector2i(-1, -1)
+	var reg = world.get_registry()
+	if reg == null:
+		return Vector2i(-1, -1)
+	var pos_comp = reg.get_component(target_eid, &"PositionComponent")
+	return pos_comp.position if pos_comp != null else Vector2i(-1, -1)
+
+func _find_approach_tiles_around(center: Vector2i, radius: int = 2) -> Array[Vector2i]:
+	var result: Array[Vector2i] = []
+	for dy in range(-radius, radius + 1):
+		for dx in range(-radius, radius + 1):
+			if absi(dx) == radius or absi(dy) == radius:
+				result.append(center + Vector2i(dx, dy))
+	return result
 

@@ -21,6 +21,29 @@ const _ItemTypes           = preload("res://modules/item/data/ItemTypes.gd")
 const _MatterComponent     = preload("res://modules/matter/components/MatterComponent.gd")
 const _MaterialTypes       = preload("res://modules/matter/data/MaterialTypes.gd")
 const _MatingComponent     = preload("res://modules/creature/components/MatingComponent.gd")
+const _SocialComponent     = preload("res://modules/creature/components/SocialComponent.gd")
+
+## Instantiates a creature entity from a configuration dictionary.
+## Supported keys:
+##   - species / species_type (int): CreatureTypes.Type (default: GRAZER)
+##   - pos / position / spawn_pos (Vector2i): spawn tile position
+##   - name / name_override (String): custom name
+##   - traits / initial_traits (Array[int]): genetic trait IDs
+##   - stage / start_stage (int): GrowthStage enum (default: -1 -> ADULT)
+##   - gender / gender_override (int): Gender enum (default: -1 -> random)
+static func create_from_config(world: Node, config: Dictionary) -> int:
+	var species: int = config.get("species_type", config.get("species", _CreatureTypes.Type.GRAZER)) as int
+	var pos: Vector2i = config.get("spawn_pos", config.get("position", config.get("pos", Vector2i.ZERO))) as Vector2i
+	var creature_name: String = config.get("name_override", config.get("name", "")) as String
+	var stage: int = config.get("start_stage", config.get("stage", -1)) as int
+	var gender: int = config.get("gender_override", config.get("gender", -1)) as int
+
+	var raw_traits = config.get("initial_traits", config.get("traits", []))
+	var traits: Array[int] = []
+	for t in raw_traits:
+		traits.append(t as int)
+
+	return create(world, species, pos, creature_name, traits, stage, gender)
 
 ## Instantiates a creature entity and its physical anatomical sub-entities.
 static func create(
@@ -246,6 +269,30 @@ static func create(
 			mating_comp.preferred_traits.append(p_pool[1])
 
 	world.add_component(creature_eid, mating_comp)
+
+	# 11. Sociality & Pack Dynamics Component
+	var social_comp := _SocialComponent.new()
+	var social_cfg: Dictionary = _CreatureTypes.get_social_profile(species_type)
+	var base_sociality: float = social_cfg.get("sociality", 0.5) as float
+	var base_pair_bond: float = social_cfg.get("pair_bond_tendency", 0.3) as float
+	var base_monogamy: float  = social_cfg.get("monogamy_tendency", 0.5) as float
+	var base_kinship: float   = social_cfg.get("kinship_tendency", 0.6) as float
+
+	# Apply trait modifiers if present
+	base_sociality += trait_comp.get_stat_offset(&"sociality_offset")
+	base_pair_bond += trait_comp.get_stat_offset(&"pair_bond_offset")
+	base_monogamy  += trait_comp.get_stat_offset(&"monogamy_offset")
+	base_kinship   += trait_comp.get_stat_offset(&"kinship_offset")
+
+	social_comp.sociality          = clampf(base_sociality, 0.0, 1.0)
+	social_comp.pair_bond_tendency = clampf(base_pair_bond, 0.0, 1.0)
+	social_comp.monogamy_tendency  = clampf(base_monogamy, 0.0, 1.0)
+	social_comp.kinship_tendency   = clampf(base_kinship, 0.0, 1.0)
+	social_comp.social_radius      = social_cfg.get("social_radius", 12) as int
+	social_comp.comfort_dist_min   = social_cfg.get("comfort_dist_min", 2) as int
+	social_comp.comfort_dist_max   = social_cfg.get("comfort_dist_max", 6) as int
+
+	world.add_component(creature_eid, social_comp)
 
 	return creature_eid
 

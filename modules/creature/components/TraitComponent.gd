@@ -134,6 +134,7 @@ func rebuild_cache() -> void:
 		_MindEmbeddings.Action.WANDER,
 		_MindEmbeddings.Action.ATTACK,
 		_MindEmbeddings.Action.MATE,
+		_MindEmbeddings.Action.SOCIALIZE,
 	]:
 		_action_weights[act] = { "mult": 1.0, "add": 0.0 }
 
@@ -160,9 +161,9 @@ func rebuild_cache() -> void:
 			if s_key.ends_with("_mult"):
 				var cur_mult: float = _stat_multipliers.get(StringName(s_key), 1.0)
 				_stat_multipliers[StringName(s_key)] = cur_mult * float(s_val)
-			elif s_key.ends_with("_mod") or s_key == "move_cooldown":
-				var cur_off: int = _stat_offsets.get(StringName(s_key), 0)
-				_stat_offsets[StringName(s_key)] = cur_off + int(s_val)
+			elif s_key.ends_with("_mod") or s_key.ends_with("_offset") or s_key == "move_cooldown":
+				var cur_off: float = _stat_offsets.get(StringName(s_key), 0.0)
+				_stat_offsets[StringName(s_key)] = cur_off + float(s_val)
 			else:
 				# General multiplier or value override
 				var cur_val: float = _stat_multipliers.get(StringName(s_key), 1.0)
@@ -186,7 +187,7 @@ func get_stat_multiplier(stat_name: StringName, default_value: float = 1.0) -> f
 		rebuild_cache()
 	return _stat_multipliers.get(stat_name, default_value)
 
-func get_stat_offset(stat_name: StringName, default_value: int = 0) -> int:
+func get_stat_offset(stat_name: StringName, default_value: float = 0.0) -> float:
 	if _dirty:
 		rebuild_cache()
-	return _stat_offsets.get(stat_name, default_value)
+	return float(_stat_offsets.get(stat_name, default_value))
