@@ -17,6 +17,11 @@ var path_queue: Array[Vector2i] = []
 ## How many consecutive ticks this creature has been performing this goal.
 var ticks_in_action: int = 0
 
+## Cooldown ticks before re-scanning local area if previous scan found no targets.
+var food_search_cooldown: int = 0
+var water_search_cooldown: int = 0
+var cover_search_cooldown: int = 0
+
 ## Helper to clear the active path.
 func clear_path() -> void:
 	path_queue.clear()

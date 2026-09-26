@@ -77,6 +77,7 @@ static func create(
 	pos_comp.base_move_interval = spec_data.get("move_cooldown", 2)
 	pos_comp.move_cooldown_ticks = 0
 	world.add_component(creature_eid, pos_comp)
+	world.register_creature(creature_eid, spawn_pos)
 
 	# 3. Physical Body & Anatomy Component (Limbs, Organs, Blood)
 	var body_comp := _BodyComponent.new()

@@ -58,7 +58,8 @@ func tick(_tick_number: int) -> void:
 		var closest_eid: int = -1
 		var has_bonded_near: bool = false
 
-		for other_eid: int in pos_store:
+		var neighbors: Array[int] = world.get_creatures_in_radius(cur_pos, float(social_comp.social_radius))
+		for other_eid: int in neighbors:
 			if other_eid == eid:
 				continue
 

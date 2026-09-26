@@ -20,6 +20,7 @@ const _SignalTypes         = preload("res://modules/signal/data/SignalTypes.gd")
 const _TileAffordance      = preload("res://modules/signal/data/TileAffordance.gd")
 const _DietTypes           = preload("res://modules/matter/data/DietTypes.gd")
 const _SocialComponent     = preload("res://modules/creature/components/SocialComponent.gd")
+const _MatingComponent     = preload("res://modules/creature/components/MatingComponent.gd")
 
 func initialize() -> void:
 	print("[CreatureAISystem] Initialized. Priority 230.")
@@ -72,6 +73,21 @@ func tick(tick_number: int) -> void:
 			mind.fear = clampf(mind.fear + hazard * 0.4 * hazard_sens, 0.0, 1.0)
 		else:
 			mind.fear = maxf(0.0, mind.fear - 0.02)
+
+		# Cooldown tick-downs for search throttling
+		if plan.food_search_cooldown > 0:
+			plan.food_search_cooldown -= 1
+		if plan.water_search_cooldown > 0:
+			plan.water_search_cooldown -= 1
+		if plan.cover_search_cooldown > 0:
+			plan.cover_search_cooldown -= 1
+
+		# Time-slicing: If not in immediate danger and path queue is actively being traversed,
+		# stagger utility re-evaluation across 5 frames
+		var is_emergency: bool = (hazard > 0.2 or mind.fear > 0.35)
+		var is_my_slice: bool = ((eid + tick_number) % 5 == 0)
+		if not is_emergency and not is_my_slice and not plan.path_queue.is_empty():
+			continue
 
 		# -------------------------------------------------------------------
 		# 2. Embedding Utility Evaluation
@@ -151,33 +167,37 @@ func _plan_drink(cur_pos: Vector2i, plan: _ActionPlanComponent, pos_comp: _Posit
 	var best_water := Vector2i(-1, -1)
 	var best_score: float = -999.0
 
-	for dy in range(-16, 17):
-		for dx in range(-16, 17):
-			var candidate := Vector2i(cur_pos.x + dx, cur_pos.y + dy)
-			if not world.is_valid_position(candidate):
-				continue
-			if not world.signals.has_affordance(candidate, _TileAffordance.DRINKABLE):
-				continue
-			if world.signals.has_affordance(candidate, _TileAffordance.HAZARD_LETHAL):
-				continue
+	if plan.water_search_cooldown <= 0:
+		for dy in range(-16, 17):
+			for dx in range(-16, 17):
+				var candidate := Vector2i(cur_pos.x + dx, cur_pos.y + dy)
+				if not world.is_valid_position(candidate):
+					continue
+				if not world.signals.has_affordance(candidate, _TileAffordance.DRINKABLE):
+					continue
+				if world.signals.has_affordance(candidate, _TileAffordance.HAZARD_LETHAL):
+					continue
 
-			var approach: Vector2i = _find_approach_for_water(candidate, cur_pos)
-			if approach == Vector2i(-1, -1):
-				continue
+				var approach: Vector2i = _find_approach_for_water(candidate, cur_pos)
+				if approach == Vector2i(-1, -1):
+					continue
 
-			var dist: float = cur_pos.distance_to(approach)
-			var hydra_val: float = world.signals.get_signal(_SignalTypes.HYDRATION, candidate)
+				var dist: float = cur_pos.distance_to(approach)
+				var hydra_val: float = world.signals.get_signal(_SignalTypes.HYDRATION, candidate)
 
-			# Penalize recently visited tiles to prevent looping
-			var recency_penalty: float = 0.0
-			if mem != null and mem.was_recently_at(approach, 30, tick_number):
-				recency_penalty = 0.5
+				# Penalize recently visited tiles to prevent looping
+				var recency_penalty: float = 0.0
+				if mem != null and mem.was_recently_at(approach, 30, tick_number):
+					recency_penalty = 0.5
 
-			var score: float = (hydra_val * 2.0) - (dist * 0.15) - recency_penalty
-			if score > best_score:
-				best_score = score
-				best_approach = approach
-				best_water = candidate
+				var score: float = (hydra_val * 2.0) - (dist * 0.15) - recency_penalty
+				if score > best_score:
+					best_score = score
+					best_approach = approach
+					best_water = candidate
+
+		if best_approach == Vector2i(-1, -1):
+			plan.water_search_cooldown = 20
 
 	# 4. Check long-term memory if no water found in immediate view
 	if best_approach == Vector2i(-1, -1) and mem != null:
@@ -281,28 +301,32 @@ func _plan_eat(cur_pos: Vector2i, plan: _ActionPlanComponent, creature: _Creatur
 	var best_tile := Vector2i(-1, -1)
 	var best_score: float = -999.0
 
-	for dy in range(-8, 9):
-		for dx in range(-8, 9):
-			var candidate := Vector2i(cur_pos.x + dx, cur_pos.y + dy)
-			if not world.is_valid_position(candidate):
-				continue
-			if not world.signals.has_affordance(candidate, _TileAffordance.WALKABLE):
-				continue
-			if not _has_compatible_food(candidate, creature.diet):
-				continue
+	if plan.food_search_cooldown <= 0:
+		for dy in range(-8, 9):
+			for dx in range(-8, 9):
+				var candidate := Vector2i(cur_pos.x + dx, cur_pos.y + dy)
+				if not world.is_valid_position(candidate):
+					continue
+				if not world.signals.has_affordance(candidate, _TileAffordance.WALKABLE):
+					continue
+				if not _has_compatible_food(candidate, creature.diet):
+					continue
 
-			var dist: float = cur_pos.distance_to(candidate)
-			var food_val: float = _get_compatible_food_signal(candidate, creature.diet)
+				var dist: float = cur_pos.distance_to(candidate)
+				var food_val: float = _get_compatible_food_signal(candidate, creature.diet)
 
-			# Penalize recently visited/eaten tiles to prevent looping
-			var recency_penalty: float = 0.0
-			if mem != null and mem.was_recently_at(candidate, 30, tick_number):
-				recency_penalty = 0.5
+				# Penalize recently visited/eaten tiles to prevent looping
+				var recency_penalty: float = 0.0
+				if mem != null and mem.was_recently_at(candidate, 30, tick_number):
+					recency_penalty = 0.5
 
-			var score: float = (food_val * 2.0) - (dist * 0.15) - recency_penalty
-			if score > best_score:
-				best_score = score
-				best_tile = candidate
+				var score: float = (food_val * 2.0) - (dist * 0.15) - recency_penalty
+				if score > best_score:
+					best_score = score
+					best_tile = candidate
+
+		if best_tile == Vector2i(-1, -1):
+			plan.food_search_cooldown = 15
 
 	var landmark: StringName = &"carrion" if creature.diet == _DietTypes.Category.CARNIVORE else &"pasture"
 
@@ -400,7 +424,18 @@ func _plan_wander(
 
 	if best_tile != Vector2i(-1, -1):
 		plan.target_tile = best_tile
-		plan.path_queue = [best_tile]
+		var w_path: Array[Vector2i] = [best_tile]
+		var step_dir: Vector2i = best_tile - cur_pos
+		var walk_p: Vector2i = best_tile
+		for _step in range(3):
+			var next_w: Vector2i = walk_p + step_dir
+			if world.is_valid_position(next_w) and world.signals.has_affordance(next_w, _TileAffordance.WALKABLE) and not world.signals.has_affordance(next_w, _TileAffordance.HAZARD_LETHAL) and world.get_creature_at(next_w) == -1:
+				w_path.append(next_w)
+				walk_p = next_w
+				plan.target_tile = next_w
+			else:
+				break
+		plan.path_queue = w_path
 
 func _plan_rest(cur_pos: Vector2i, plan: _ActionPlanComponent, mem: _MemoryComponent, tick_number: int) -> void:
 	# 1. If current tile already provides COVER, stay and rest right here!
@@ -418,27 +453,31 @@ func _plan_rest(cur_pos: Vector2i, plan: _ActionPlanComponent, mem: _MemoryCompo
 	var best_cover_tile := Vector2i(-1, -1)
 	var best_score: float = -999.0
 
-	for dy in range(-16, 17):
-		for dx in range(-16, 17):
-			var candidate := Vector2i(cur_pos.x + dx, cur_pos.y + dy)
-			if not world.is_valid_position(candidate):
-				continue
-			if not world.signals.has_affordance(candidate, _TileAffordance.WALKABLE):
-				continue
-			if not world.signals.has_affordance(candidate, _TileAffordance.COVER):
-				continue
-			if world.signals.has_affordance(candidate, _TileAffordance.HAZARD_LETHAL):
-				continue
+	if plan.cover_search_cooldown <= 0:
+		for dy in range(-16, 17):
+			for dx in range(-16, 17):
+				var candidate := Vector2i(cur_pos.x + dx, cur_pos.y + dy)
+				if not world.is_valid_position(candidate):
+					continue
+				if not world.signals.has_affordance(candidate, _TileAffordance.WALKABLE):
+					continue
+				if not world.signals.has_affordance(candidate, _TileAffordance.COVER):
+					continue
+				if world.signals.has_affordance(candidate, _TileAffordance.HAZARD_LETHAL):
+					continue
 
-			var dist: float = cur_pos.distance_to(candidate)
-			var cover_val: float = world.signals.get_signal(_SignalTypes.COVER, candidate)
-			var hazard_val: float = world.signals.get_signal(_SignalTypes.HAZARD, candidate)
+				var dist: float = cur_pos.distance_to(candidate)
+				var cover_val: float = world.signals.get_signal(_SignalTypes.COVER, candidate)
+				var hazard_val: float = world.signals.get_signal(_SignalTypes.HAZARD, candidate)
 
-			# Prioritize higher cover quality, closer distance, lower hazard
-			var score: float = (cover_val * 3.0) - (dist * 0.20) - (hazard_val * 5.0)
-			if score > best_score:
-				best_score = score
-				best_cover_tile = candidate
+				# Prioritize higher cover quality, closer distance, lower hazard
+				var score: float = (cover_val * 3.0) - (dist * 0.20) - (hazard_val * 5.0)
+				if score > best_score:
+					best_score = score
+					best_cover_tile = candidate
+
+		if best_cover_tile == Vector2i(-1, -1):
+			plan.cover_search_cooldown = 20
 
 	# 4. Check long-term memory for remembered shelter / cover landmark if none visible nearby
 	if best_cover_tile == Vector2i(-1, -1) and mem != null:
@@ -555,11 +594,31 @@ func _plan_mate(
 				best_pos = partner_pos_c.position
 
 	if best_candidate == -1:
-		for cand_eid: int in pos_store:
+		var cand_neighbors: Array[int] = world.get_creatures_in_radius(cur_pos, 16.0)
+		var creature_store: Dictionary = reg.get_store(&"CreatureComponent")
+		var mating_store: Dictionary = reg.get_store(&"MatingComponent")
+		var my_creature: _CreatureComponent = creature_store.get(eid, null)
+		var my_mating: _MatingComponent = mating_store.get(eid, null)
+
+		for cand_eid: int in cand_neighbors:
 			if cand_eid == eid:
 				continue
 
-			var cand_pos: Vector2i = pos_store[cand_eid].position
+			# Fast pre-filtering before expensive can_mate / trait matching
+			if my_creature != null and my_mating != null:
+				var cand_c: _CreatureComponent = creature_store.get(cand_eid, null)
+				var cand_m: _MatingComponent = mating_store.get(cand_eid, null)
+				if cand_c == null or not cand_c.is_alive or cand_c.species_type != my_creature.species_type:
+					continue
+				if cand_m == null or cand_m.gender == my_mating.gender:
+					continue
+				if not cand_m.is_ready_to_mate():
+					continue
+
+			var cand_pos_comp: _PositionComponent = pos_store.get(cand_eid, null)
+			if cand_pos_comp == null:
+				continue
+			var cand_pos: Vector2i = cand_pos_comp.position
 			var dist: float = cur_pos.distance_to(cand_pos)
 			if dist > 16.0:
 				continue
@@ -684,6 +743,8 @@ func _plan_socialize(
 			if d < min_app_d:
 				min_app_d = d
 				best_app = app
+				if min_app_d <= 1.5:
+					break
 
 	if best_app != Vector2i(-1, -1):
 		plan.target_tile = best_app

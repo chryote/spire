@@ -60,7 +60,9 @@ func tick(tick_number: int) -> void:
 				if move_delta != Vector2i.ZERO:
 					pos_comp.facing = move_delta
 
+				var old_pos: Vector2i = pos_comp.position
 				pos_comp.position = next_pos
+				world.update_creature_position(eid, old_pos, next_pos)
 				any_moved = true
 
 				# Cooldown modified by leg mobility and traits

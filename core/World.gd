@@ -135,6 +135,8 @@ var _tick_accumulator: float = 0.0
 var _next_entity_id: int = 0
 var _active_entities: Dictionary = {}   # int → true
 var _tile_index: Dictionary = {}        # Vector2i → int (entity_id)
+var _creature_spatial_index: Dictionary = {}  # Vector2i → int (entity_id)
+var _creature_buckets: Dictionary = {}        # Vector2i (bucket_coord) → Dictionary[int, bool]
 
 # ---------------------------------------------------------------------------
 # ECS core objects
@@ -367,6 +369,12 @@ func destroy_entity(id: int) -> void:
 	var tile = _registry.get_component(id, &"TileComponent")
 	if tile != null:
 		_tile_index.erase(tile.position)
+
+	# Clean up creature spatial index if entity has position
+	var pos_comp = _registry.get_component(id, &"PositionComponent")
+	if pos_comp != null:
+		unregister_creature(id, pos_comp.position)
+
 	_active_entities.erase(id)
 	_registry.remove_all(id)
 
@@ -375,7 +383,7 @@ func get_all_entities() -> Array:
 	return _active_entities.keys()
 
 # ===========================================================================
-# Spatial tile index
+# Spatial tile & creature indices
 # ===========================================================================
 
 ## Register entity as the occupant of a world tile position.
@@ -391,15 +399,73 @@ func is_valid_position(pos: Vector2i) -> bool:
 	return pos.x >= 0 and pos.x < MAP_WIDTH \
 		and pos.y >= 0 and pos.y < MAP_HEIGHT
 
-## Return the creature entity ID at a tile position, or -1 if none.
+## Register creature entity at world tile position in spatial index and bucket grid.
+func register_creature(entity_id: int, pos: Vector2i) -> void:
+	_creature_spatial_index[pos] = entity_id
+	var b_coord := Vector2i(pos.x >> 4, pos.y >> 4)
+	if not _creature_buckets.has(b_coord):
+		_creature_buckets[b_coord] = {}
+	_creature_buckets[b_coord][entity_id] = true
+
+## Unregister creature entity from world tile position.
+func unregister_creature(entity_id: int, pos: Vector2i) -> void:
+	if _creature_spatial_index.get(pos, -1) == entity_id:
+		_creature_spatial_index.erase(pos)
+	var b_coord := Vector2i(pos.x >> 4, pos.y >> 4)
+	if _creature_buckets.has(b_coord):
+		_creature_buckets[b_coord].erase(entity_id)
+
+## Update creature entity position in spatial indices.
+func update_creature_position(entity_id: int, from_pos: Vector2i, to_pos: Vector2i) -> void:
+	if _creature_spatial_index.get(from_pos, -1) == entity_id:
+		_creature_spatial_index.erase(from_pos)
+	_creature_spatial_index[to_pos] = entity_id
+
+	var old_b := Vector2i(from_pos.x >> 4, from_pos.y >> 4)
+	var new_b := Vector2i(to_pos.x >> 4, to_pos.y >> 4)
+	if old_b != new_b:
+		if _creature_buckets.has(old_b):
+			_creature_buckets[old_b].erase(entity_id)
+		if not _creature_buckets.has(new_b):
+			_creature_buckets[new_b] = {}
+		_creature_buckets[new_b][entity_id] = true
+
+## Return the creature entity ID at a tile position, or -1 if none. (O(1))
 func get_creature_at(pos: Vector2i) -> int:
-	if _registry == null:
-		return -1
-	var pos_store: Dictionary = _registry.get_store(&"PositionComponent")
-	for eid: int in pos_store:
-		if pos_store[eid].position == pos:
-			return eid
+	var eid: int = _creature_spatial_index.get(pos, -1)
+	if eid != -1:
+		return eid
+	# Fallback self-healing safety net for unindexed entities
+	if _registry != null:
+		var pos_store: Dictionary = _registry.get_store(&"PositionComponent")
+		for cand_eid: int in pos_store:
+			if pos_store[cand_eid].position == pos:
+				register_creature(cand_eid, pos)
+				return cand_eid
 	return -1
+
+## Return array of creature entity IDs within radius of center position.
+func get_creatures_in_radius(center: Vector2i, radius: float) -> Array[int]:
+	var results: Array[int] = []
+	var r_int: int = int(ceil(radius))
+	var min_bx: int = maxi(0, (center.x - r_int) >> 4)
+	var max_bx: int = mini(7, (center.x + r_int) >> 4)
+	var min_by: int = maxi(0, (center.y - r_int) >> 4)
+	var max_by: int = mini(7, (center.y + r_int) >> 4)
+	var r_sq: float = radius * radius
+
+	var pos_store: Dictionary = _registry.get_store(&"PositionComponent") if _registry != null else {}
+
+	for by in range(min_by, max_by + 1):
+		for bx in range(min_bx, max_bx + 1):
+			var b_coord := Vector2i(bx, by)
+			var bucket: Dictionary = _creature_buckets.get(b_coord, {})
+			for eid: int in bucket:
+				var pos_comp = pos_store.get(eid, null)
+				if pos_comp != null:
+					if Vector2(center).distance_squared_to(Vector2(pos_comp.position)) <= r_sq:
+						results.append(eid)
+	return results
 
 # ===========================================================================
 # Component API (delegates to registry)
