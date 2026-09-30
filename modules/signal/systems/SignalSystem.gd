@@ -298,6 +298,16 @@ func get_affordance(pos: Vector2i) -> int:
 func has_affordance(pos: Vector2i, flag: int) -> bool:
 	return (get_affordance(pos) & flag) != 0
 
+## Sets or clears a specific affordance flag at pos.
+func set_affordance(pos: Vector2i, flag: int, enabled: bool = true) -> void:
+	if pos.x < 0 or pos.x >= _width or pos.y < 0 or pos.y >= _height:
+		return
+	var idx: int = pos.y * _width + pos.x
+	if enabled:
+		affordance_map[idx] |= flag
+	else:
+		affordance_map[idx] &= ~flag
+
 ## Computes the spatial gradient vector for a channel at pos (points towards highest intensity).
 func get_gradient(channel_name: StringName, pos: Vector2i) -> Vector2:
 	var ch = _channels.get(channel_name, null)

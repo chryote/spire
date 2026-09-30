@@ -15,6 +15,7 @@ enum Type {
 	GRAZER = 0,
 	HARE   = 1,
 	DEER   = 2,
+	WOLF   = 3,
 }
 
 enum GrowthStage {
@@ -42,6 +43,8 @@ const DATA: Dictionary = {
 		"stomach_capacity":  50.0,       # nutrition points
 		"blood_volume":      2.2,        # liters
 		"diet":              _DietTypes.Category.HERBIVORE,
+		"can_swim":          false,
+		"swim_speed_mult":   0.35,
 		"graze_amount":      1,          # growth stages or grass items per bite
 		"graze_satiation":   0.25,       # hunger reduction per bite (0.0 to 1.0)
 		"innate_traits":     [ _TraitTypes.Type.HARDY ],
@@ -147,6 +150,8 @@ const DATA: Dictionary = {
 		"stomach_capacity":  20.0,
 		"blood_volume":      0.5,
 		"diet":              _DietTypes.Category.HERBIVORE,
+		"can_swim":          false,
+		"swim_speed_mult":   0.35,
 		"graze_amount":      1,
 		"graze_satiation":   0.35,
 		"innate_traits":     [ _TraitTypes.Type.TIMID, _TraitTypes.Type.FLEET_FOOTED ],
@@ -252,6 +257,8 @@ const DATA: Dictionary = {
 		"stomach_capacity":  120.0,
 		"blood_volume":      5.5,
 		"diet":              _DietTypes.Category.HERBIVORE,
+		"can_swim":          true,
+		"swim_speed_mult":   0.60,
 		"graze_amount":      1,
 		"graze_satiation":   0.20,
 		"innate_traits":     [ _TraitTypes.Type.CURIOUS, _TraitTypes.Type.FLEET_FOOTED ],
@@ -340,6 +347,113 @@ const DATA: Dictionary = {
 				"velocity_mult":     1.2,
 				"sharpness":         0.7,
 				"stamina_cost":      0.15,
+				"striking_material": _MaterialTypes.Type.BONE,
+			},
+		}
+	},
+	Type.WOLF: {
+		"display_name":      "Wolf",
+		"glyph":             "w",
+		"fg_color":          Color(0.88, 0.38, 0.28, 1.0),
+		"bg_color":          Color(0.0, 0.0, 0.0, 0.0),
+		"base_mass":         40.0,
+		"move_cooldown":     1,          # Fast pursuit hunter
+		"metabolism_rate":   0.0035,
+		"thirst_rate":       0.0025,
+		"sight_radius":      50,
+		"stomach_capacity":  60.0,
+		"blood_volume":      3.2,
+		"diet":              _DietTypes.Category.CARNIVORE,
+		"can_swim":          true,
+		"swim_speed_mult":   0.75,
+		"graze_amount":      0,
+		"graze_satiation":   0.0,
+		"innate_traits":     [ _TraitTypes.Type.BOLD, _TraitTypes.Type.FLEET_FOOTED ],
+		"trait_pool":        [ _TraitTypes.Type.HARDY, _TraitTypes.Type.VIGILANT ],
+		"growth_profile": {
+			"stages": {
+				GrowthStage.JUVENILE: {
+					"name": "Pup",
+					"min_age_ticks": 0,
+					"body_scale": 0.35,
+					"glyph": "w",
+					"traits_gained": [ _TraitTypes.Type.CURIOUS ],
+					"traits_lost": [ _TraitTypes.Type.FLEET_FOOTED ],
+				},
+				GrowthStage.ADULT: {
+					"name": "Adult",
+					"min_age_ticks": 2800,
+					"body_scale": 1.00,
+					"glyph": "W",
+					"traits_gained": [ _TraitTypes.Type.FLEET_FOOTED ],
+					"traits_lost": [ _TraitTypes.Type.CURIOUS ],
+				},
+				GrowthStage.ELDER: {
+					"name": "Elder",
+					"min_age_ticks": 32000,
+					"body_scale": 0.92,
+					"glyph": "W",
+					"traits_gained": [ _TraitTypes.Type.HARDY ],
+					"traits_lost": [],
+				}
+			},
+			"growth_rate_per_rare_tick": 0.012,
+		},
+		"reproduction": {
+			"female_spawn_rate":  1.2,
+			"litter_size_min":    2,
+			"litter_size_max":    4,
+			"gestation_duration": 700,
+			"mating_cooldown":    1400,
+		},
+		"social": {
+			"sociality":          0.60,      # Pack dynamics
+			"pair_bond_tendency": 0.70,
+			"monogamy_tendency":   0.80,
+			"kinship_tendency":   0.85,
+			"social_radius":      14,
+			"comfort_dist_min":   2,
+			"comfort_dist_max":   6,
+		},
+		"anatomy": {
+			"limbs": {
+				"head":          { "volume": 0.0040, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.0 },
+				"torso":         { "volume": 0.0220, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.0 },
+				"left_foreleg":  { "volume": 0.0035, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.25 },
+				"right_foreleg": { "volume": 0.0035, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.25 },
+				"left_hindleg":  { "volume": 0.0040, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.25 },
+				"right_hindleg": { "volume": 0.0040, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.25 },
+			},
+			"genitals": {
+				Gender.MALE:   { "name": "male_genital",   "volume": 0.0004, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.0 },
+				Gender.FEMALE: { "name": "female_genital", "volume": 0.0004, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.0 },
+			},
+			"organs": {
+				"heart":   { "volume": 0.0006, "matter": _MaterialTypes.Type.RAW_MEAT, "vital": true },
+				"lungs":   { "volume": 0.0012, "matter": _MaterialTypes.Type.RAW_MEAT, "vital": true },
+				"stomach": { "volume": 0.0015, "matter": _MaterialTypes.Type.RAW_MEAT, "vital": false },
+				"brain":   { "volume": 0.0005, "matter": _MaterialTypes.Type.RAW_MEAT, "vital": true },
+			}
+		},
+		"natural_attacks": {
+			"bite": {
+				"limb":              "head",
+				"form":              _ImpactTypes.Form.PIERCE,
+				"contact_area":      0.0001,
+				"mass_ratio":        0.75,
+				"velocity_mult":     1.8,
+				"sharpness":         2.2,
+				"stamina_cost":      0.15,
+				"striking_material": _MaterialTypes.Type.BONE,
+			},
+			"claw_swipe": {
+				"limb":              "left_foreleg",
+				"form":              _ImpactTypes.Form.SLASH,
+				"contact_area":      0.0002,
+				"mass_ratio":        0.30,
+				"velocity_mult":     1.6,
+				"sharpness":         1.8,
+				"stamina_cost":      0.10,
 				"striking_material": _MaterialTypes.Type.BONE,
 			},
 		}

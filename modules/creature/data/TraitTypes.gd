@@ -27,6 +27,7 @@ enum Type {
 	FRAIL        = 9,
 	GREGARIOUS   = 10,
 	SOLITARY     = 11,
+	SWIMMER      = 12,
 
 	# --- Buffs (100 - 199) ---
 	WELL_FED        = 100,
@@ -195,6 +196,18 @@ const DATA: Dictionary = {
 			"pair_bond_offset": -0.20,
 			"monogamy_offset":  -0.20,
 			"kinship_offset":   -0.25,
+		}
+	},
+	Type.SWIMMER: {
+		"name": "Swimmer",
+		"description": "Natural aquatic affinity; swims easily through deep water bodies.",
+		"category": Category.GENETIC,
+		"color": Color(0.35, 0.75, 0.95, 1.0),
+		"action_weights": {},
+		"stat_modifiers": {
+			"can_swim": 1.0,
+			"can_swim_offset": 1.0,
+			"swim_speed_mult": 0.25,
 		}
 	},
 

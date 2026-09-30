@@ -21,6 +21,9 @@ var creature_name: String = "Creature"
 ## Alive / dead state.
 var is_alive: bool = true
 
+## True once dead body items have been transferred to the tile inventory.
+var carcass_dropped: bool = false
+
 ## Monotonically increasing age in simulation ticks.
 var age_ticks: int = 0
 
@@ -38,3 +41,9 @@ var stomach_capacity: float = 50.0
 
 ## Speed multiplier derived from leg mobility and terrain.
 var mobility_factor: float = 1.0
+
+## Whether this creature can traverse SWIMMABLE deep water tiles.
+var can_swim: bool = false
+
+## Locomotion speed modifier while swimming through deep water.
+var swim_speed_mult: float = 0.60

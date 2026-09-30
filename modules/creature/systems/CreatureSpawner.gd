@@ -36,12 +36,76 @@ const DEFAULT_STARTER_CONFIGS: Array[Dictionary] = [
 	}
 ]
 
+## Default starter creature configuration with 1 predator: A pair of Grazers in the plains
+## and 1 Lone Wolf prowling the temperate forest / hills edge.
+const STARTER_CONFIGS_WITH_PREDATOR: Array[Dictionary] = [
+	{
+		"species": _CreatureTypes.Type.GRAZER,
+		"gender": _CreatureTypes.Gender.MALE,
+		"name": "Male Grazer",
+		"options": {
+			"min_y": 65,
+			"max_y": 95,
+			"require_vegetation": true,
+		}
+	},
+	{
+		"species": _CreatureTypes.Type.GRAZER,
+		"gender": _CreatureTypes.Gender.FEMALE,
+		"name": "Female Grazer",
+		"options": {
+			"min_y": 65,
+			"max_y": 95,
+			"require_vegetation": true,
+			"near_previous": true,
+			"min_distance": 2,
+			"max_distance": 10,
+		}
+	},
+	{
+		"species": _CreatureTypes.Type.WOLF,
+		"gender": _CreatureTypes.Gender.MALE,
+		"name": "Lone Wolf",
+		"options": {
+			"min_y": 30,
+			"max_y": 55,
+			"require_vegetation": false,
+		}
+	}
+]
+
 ## Returns a copy of the default starter creature configuration list.
 static func get_default_starter_configs() -> Array[Dictionary]:
 	var result: Array[Dictionary] = []
 	for cfg in DEFAULT_STARTER_CONFIGS:
 		result.append(cfg.duplicate(true))
 	return result
+
+## Returns a copy of the starter configuration including a predator.
+static func get_starter_configs_with_predator() -> Array[Dictionary]:
+	var result: Array[Dictionary] = []
+	for cfg in STARTER_CONFIGS_WITH_PREDATOR:
+		result.append(cfg.duplicate(true))
+	return result
+
+## Spawns a single predator entity (Wolf by default) into the simulation.
+static func spawn_predator(
+	world: Node,
+	custom_config: Dictionary = {},
+	excluded_positions: Array[Vector2i] = []
+) -> int:
+	var cfg: Dictionary = {
+		"species": _CreatureTypes.Type.WOLF,
+		"gender": _CreatureTypes.Gender.MALE,
+		"name": "Lone Wolf",
+		"options": {
+			"min_y": 30,
+			"max_y": 60,
+			"require_vegetation": false,
+		}
+	}
+	cfg.merge(custom_config, true)
+	return spawn_creature(world, cfg, excluded_positions)
 
 # ---------------------------------------------------------------------------
 # Spatial Query & Spawn Location Helpers

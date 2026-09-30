@@ -1,0 +1,9 @@
+PASSED: Predator (Wolf) Archetype, Scent, Hunting & Feeding Loop Verified.
+- Wolf archetype with CARNIVORE diet, bite (PIERCE) and claw (SLASH) attacks.
+- Scent emission: SCENT_PREDATOR triggers panic and evasion in prey.
+- Autonomous hunting AI: Hungry wolves target, stalk, and pursue live prey.
+- Kinetic combat impact execution and wound trauma.
+- Prey mortality drops carcass items (RAW_MEAT, BONE) to tile inventory.
+- Carnivore feeding loop consumes carcass meat and reduces hunger.
+- Extensible starter population spawning with 1 Lone Wolf and 2 Grazers.
+- Long-range sight hunting (up to 50 tiles) and zero-freeze active territory prowl.

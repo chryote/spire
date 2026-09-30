@@ -425,12 +425,20 @@ func _execute_attack(
 			continue
 		var other_pos = pos_store.get(other_eid, null)
 		if other_pos != null and other_pos.position == target_pos:
-			effective_target_eid = other_eid
-			break
+			var target_c: _CreatureComponent = creature_store.get(other_eid, null)
+			if target_c != null and target_c.is_alive:
+				effective_target_eid = other_eid
+				break
 
-	# Fallback to terrain tile entity
-	if effective_target_eid == -1:
-		effective_target_eid = world.get_entity_at(target_pos)
+	if effective_target_eid == -1 and plan.target_eid != -1:
+		var target_c: _CreatureComponent = creature_store.get(plan.target_eid, null)
+		var other_pos = pos_store.get(plan.target_eid, null)
+		if target_c != null and target_c.is_alive and other_pos != null and pos_comp.position.distance_squared_to(other_pos.position) <= 2:
+			effective_target_eid = plan.target_eid
+			target_pos = other_pos.position
+			var direct_strike: Vector2i = target_pos - pos_comp.position
+			if direct_strike != Vector2i.ZERO:
+				pos_comp.facing = direct_strike
 
 	if effective_target_eid == -1:
 		plan.clear_path()

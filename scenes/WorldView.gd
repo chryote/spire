@@ -21,7 +21,7 @@ const _CreatureSpawner        = preload("res://modules/creature/systems/Creature
 var _diag: _PerformanceDiagnostics = null
 
 ## Optional configuration list for starter creatures.
-## When empty, defaults to _CreatureSpawner.DEFAULT_STARTER_CONFIGS (Male & Female Grazer).
+## When empty, defaults to _CreatureSpawner.STARTER_CONFIGS_WITH_PREDATOR (Male & Female Grazer + Lone Wolf).
 var starter_creature_configs: Array[Dictionary] = []
 
 func _ready() -> void:
@@ -35,11 +35,11 @@ func _ready() -> void:
 # ---------------------------------------------------------------------------
 
 ## Spawns starter creatures into the simulation using the extensible CreatureSpawner helper.
-## Defaults to a male and female Grazer pair if no custom configs are provided.
+## Defaults to a male and female Grazer pair plus 1 Lone Wolf predator.
 func spawn_starter_creatures(configs: Array = []) -> Array[int]:
 	var active_configs: Array = configs
 	if active_configs.is_empty():
-		active_configs = starter_creature_configs if not starter_creature_configs.is_empty() else _CreatureSpawner.DEFAULT_STARTER_CONFIGS
+		active_configs = starter_creature_configs if not starter_creature_configs.is_empty() else _CreatureSpawner.STARTER_CONFIGS_WITH_PREDATOR
 	return _CreatureSpawner.spawn_starter_creatures(World, active_configs)
 
 ## Backward-compatibility helper for legacy single-creature starter invocation.

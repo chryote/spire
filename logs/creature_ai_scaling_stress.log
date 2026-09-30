@@ -5,26 +5,26 @@
 --- Stage 1: 10 Starter Grazers (Running 20 ticks) ---
   Spawned total: 10 creatures active on map.
   Stage Results:
-    Total Tick Mean Duration:     10.49 ms
-    CreatureAISystem Mean:        538.7 usec (0.539 ms) [Max: 1695 usec]
-    SocialSystem Mean:            191.0 usec (0.191 ms) [Max: 199 usec]
-    CreatureLocomotionSystem:     58.0 usec (0.058 ms) [Max: 83 usec]
+    Total Tick Mean Duration:     10.57 ms
+    CreatureAISystem Mean:        619.9 usec (0.620 ms) [Max: 2063 usec]
+    SocialSystem Mean:            162.3 usec (0.162 ms) [Max: 200 usec]
+    CreatureLocomotionSystem:     67.5 usec (0.068 ms) [Max: 152 usec]
 
 --- Stage 2: 50 Grazers (Target Scale Problem) (Running 30 ticks) ---
   Spawned total: 50 creatures active on map.
   Stage Results:
-    Total Tick Mean Duration:     17.88 ms
-    CreatureAISystem Mean:        2311.9 usec (2.312 ms) [Max: 3239 usec]
-    SocialSystem Mean:            1747.8 usec (1.748 ms) [Max: 2119 usec]
-    CreatureLocomotionSystem:     185.9 usec (0.186 ms) [Max: 310 usec]
+    Total Tick Mean Duration:     18.75 ms
+    CreatureAISystem Mean:        3229.0 usec (3.229 ms) [Max: 5501 usec]
+    SocialSystem Mean:            1436.8 usec (1.437 ms) [Max: 1794 usec]
+    CreatureLocomotionSystem:     435.7 usec (0.436 ms) [Max: 865 usec]
 
 --- Stage 3: 80 Grazers (Heavy Stress Scale) (Running 25 ticks) ---
   Spawned total: 80 creatures active on map.
   Stage Results:
-    Total Tick Mean Duration:     26.18 ms
-    CreatureAISystem Mean:        4118.0 usec (4.118 ms) [Max: 5838 usec]
-    SocialSystem Mean:            3620.3 usec (3.620 ms) [Max: 3942 usec]
-    CreatureLocomotionSystem:     308.2 usec (0.308 ms) [Max: 513 usec]
+    Total Tick Mean Duration:     27.95 ms
+    CreatureAISystem Mean:        5952.0 usec (5.952 ms) [Max: 11983 usec]
+    SocialSystem Mean:            3076.3 usec (3.076 ms) [Max: 3431 usec]
+    CreatureLocomotionSystem:     874.6 usec (0.875 ms) [Max: 1113 usec]
 
 =================================================================
 >>> ALL CREATURE AI SCALING STRESS BENCHMARKS PASSED! <<<

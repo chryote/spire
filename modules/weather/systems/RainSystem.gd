@@ -138,9 +138,9 @@ func tick(tick_number: int) -> void:
 	# --- System condition gate ---
 	# If current weather condition does not permit rain, clear active rain and process drying/evaporation
 	if not world.rain_allowed:
-		var rain_store: Dictionary = reg.get_store(&"RainComponent")
-		if not rain_store.is_empty():
-			var to_remove: Array = rain_store.keys()
+		var active_rain_store: Dictionary = reg.get_store(&"RainComponent")
+		if not active_rain_store.is_empty():
+			var to_remove: Array = active_rain_store.keys()
 			for eid: int in to_remove:
 				reg.remove(eid, &"RainComponent")
 			for b in range(SLICE_COUNT):

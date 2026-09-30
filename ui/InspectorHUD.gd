@@ -677,6 +677,13 @@ func _render_creature(reg, ceid: int) -> void:
 	var c_data: Dictionary = _CreatureTypes.get_data(creature.species_type)
 	var species_name: String = c_data.get("display_name", "Creature")
 	var status_str: String = "[ALIVE]" if creature.is_alive else "[DEAD / CARCASS]"
+	if creature.is_alive and World != null and World.signals != null:
+		var pos_c = reg.get_component(ceid, &"PositionComponent")
+		if pos_c != null:
+			var has_swim: bool = World.signals.has_affordance(pos_c.position, _TileAffordance.SWIMMABLE)
+			var has_walk: bool = World.signals.has_affordance(pos_c.position, _TileAffordance.WALKABLE)
+			if has_swim and not has_walk:
+				status_str = "[ALIVE: SWIMMING]"
 
 	if tab_container != null:
 		tab_container.set_tab_title(1, "Creature (%s)" % species_name)
@@ -726,13 +733,28 @@ func _render_creature(reg, ceid: int) -> void:
 	if plan != null:
 		match plan.current_goal:
 			_MindEmbeddings.Action.EAT:
-				act_name = "EAT"
-				if plan.target_tile == selected_tile or plan.path_queue.is_empty():
-					thought_text = "Consuming compatible food to satiate hunger."
+				if creature.diet == _DietTypes.Category.CARNIVORE:
+					if plan.target_eid != -1:
+						act_name = "HUNT (PURSUIT)"
+						thought_text = "Tracking and pursuing prey at %s (hunger drive: %.0f%%)." % [
+							plan.target_tile, mind.hunger * 100.0 if mind != null else 100.0
+						]
+					elif not plan.path_queue.is_empty():
+						act_name = "HUNT (PROWLING)"
+						thought_text = "Prowling territory in search of prey (hunger drive: %.0f%%)." % [
+							mind.hunger * 100.0 if mind != null else 100.0
+						]
+					else:
+						act_name = "EAT"
+						thought_text = "Consuming meat carcass to satiate hunger."
 				else:
-					thought_text = "Seeking food at %s (hunger drive: %.0f%%)." % [
-						plan.target_tile, mind.hunger * 100.0 if mind != null else 50.0
-					]
+					act_name = "EAT"
+					if plan.target_tile == selected_tile or plan.path_queue.is_empty():
+						thought_text = "Consuming compatible food to satiate hunger."
+					else:
+						thought_text = "Seeking food at %s (hunger drive: %.0f%%)." % [
+							plan.target_tile, mind.hunger * 100.0 if mind != null else 50.0
+						]
 			_MindEmbeddings.Action.DRINK:
 				act_name = "DRINK"
 				if plan.target_tile == selected_tile or plan.path_queue.is_empty():
@@ -743,7 +765,10 @@ func _render_creature(reg, ceid: int) -> void:
 					]
 			_MindEmbeddings.Action.FLEE:
 				act_name = "FLEE"
-				thought_text = "Fleeing in panic from dangerous hazards!"
+				thought_text = "Fleeing in panic from dangerous hazards or predators!"
+			_MindEmbeddings.Action.ATTACK:
+				act_name = "ATTACK"
+				thought_text = "Striking target with natural predatory attacks!"
 			_MindEmbeddings.Action.REST:
 				act_name = "REST"
 				if plan.target_tile != selected_tile and not plan.path_queue.is_empty():
@@ -844,6 +869,11 @@ func _render_creature(reg, ceid: int) -> void:
 				var prog_pct: int = int(round(growth_c.growth_progress * 100.0))
 				var stunt_str: String = " [color=#ff6666](Growth Stunted: Malnourished)[/color]" if growth_c.is_stunted else ""
 				t_lines.append("[b]Life Stage:[/b] [color=#e0ffff]%s[/color] (Maturation: %d%%)%s" % [st_name, prog_pct, stunt_str])
+
+			# Aquatic Mobility
+			var can_swim: bool = creature.can_swim or traits.has_trait(_TraitTypes.Type.SWIMMER)
+			var swim_info: String = "[color=#00e5ff]Capable (Drag: %.2fx)[/color]" % (1.0 / maxf(0.01, creature.swim_speed_mult)) if can_swim else "[color=#888888]Land-bound[/color]"
+			t_lines.append("[b]Aquatic Mobility:[/b] %s" % swim_info)
 
 			# Genetic traits
 			var g_parts: Array[String] = []

@@ -145,8 +145,10 @@ var _registry = null   # ComponentRegistry instance
 var _sim_systems: Array = []
 var impact_solver = null
 var signals = null
+var creature_body = null
 var mating_system = null
 var social_system = null
+var creature_ai = null
 var creature_locomotion = null
 var creature_abilities = null
 
@@ -326,12 +328,14 @@ func _register_modules() -> void:
 	# --- Creature module (priorities 223, 224, 225, 226, 227, 230, 235, 240) ---
 	_add_system(_CreatureGrowthSystem.new(), 223)
 	_add_system(_TraitSystem.new(), 224)
-	_add_system(_CreatureBodySystem.new(), 225)
+	creature_body = _CreatureBodySystem.new()
+	_add_system(creature_body, 225)
 	mating_system = _MatingSystem.new()
 	_add_system(mating_system, 226)
 	social_system = _SocialSystem.new()
 	_add_system(social_system, 227)
-	_add_system(_CreatureAISystem.new(), 230)
+	creature_ai = _CreatureAISystem.new()
+	_add_system(creature_ai, 230)
 	creature_locomotion = _CreatureLocomotionSystem.new()
 	_add_system(creature_locomotion, 235)
 	creature_abilities = _CreatureAbilitySystem.new()
@@ -437,8 +441,12 @@ func get_creature_at(pos: Vector2i) -> int:
 		return eid
 	# Fallback self-healing safety net for unindexed entities
 	if _registry != null:
+		var creature_store: Dictionary = _registry.get_store(&"CreatureComponent")
 		var pos_store: Dictionary = _registry.get_store(&"PositionComponent")
 		for cand_eid: int in pos_store:
+			var c_comp = creature_store.get(cand_eid, null)
+			if c_comp != null and not c_comp.is_alive:
+				continue
 			if pos_store[cand_eid].position == pos:
 				register_creature(cand_eid, pos)
 				return cand_eid

@@ -105,7 +105,10 @@ static func evaluate_utility(
 	match action:
 		Action.FLEE:
 			var hazard: float = perception.get(&"hazard", 0.0) as float
+			var pred_scent: float = perception.get(&"scent_predator", 0.0) as float
 			var fear: float   = drives[Drive.FEAR]
+			if creature_diet != _DietTypes.Category.CARNIVORE and pred_scent > 0.1:
+				hazard = maxf(hazard, pred_scent)
 			if hazard > 0.2 or fear > 0.35:
 				return clampf(fear * 1.5 + hazard * 1.5, 0.0, 1.0)
 			return 0.0
@@ -116,7 +119,9 @@ static func evaluate_utility(
 				_DietTypes.Category.HERBIVORE:
 					food_avail = perception.get(&"food_plant", 0.0) as float
 				_DietTypes.Category.CARNIVORE:
-					food_avail = perception.get(&"food_meat", 0.0) as float
+					var m_val: float = perception.get(&"food_meat", 0.0) as float
+					var prey_val: float = perception.get(&"prey_nearby", 0.0) as float
+					food_avail = maxf(m_val, prey_val)
 				_DietTypes.Category.OMNIVORE:
 					var p_val: float = perception.get(&"food_plant", 0.0) as float
 					var m_val: float = perception.get(&"food_meat", 0.0) as float
@@ -154,11 +159,24 @@ static func evaluate_utility(
 			return 0.08
 
 		Action.ATTACK:
+			var prey_adjacent: float = perception.get(&"prey_adjacent", 0.0) as float
+			var enemy_adjacent: float = perception.get(&"enemy_adjacent", 0.0) as float
+			var has_target: bool = (prey_adjacent > 0.0 or enemy_adjacent > 0.0)
+			if not has_target:
+				return 0.0
+
 			var pain: float = drives[Drive.PAIN]
 			var fear: float = drives[Drive.FEAR]
-			var hazard: float = perception.get(&"hazard", 0.0) as float
-			if pain > 0.3 or (fear > 0.5 and hazard > 0.4):
+			# Self-defense retaliatory strike when attacked and target is adjacent
+			if pain > 0.3 or fear > 0.5:
 				return clampf(pain * 0.7 + fear * 0.5, 0.0, 1.0)
+
+			# Carnivore predatory hunting strike when prey is adjacent
+			if creature_diet == _DietTypes.Category.CARNIVORE:
+				var hunger: float = drives[Drive.HUNGER]
+				if hunger > 0.20:
+					return clampf(pow(hunger, 1.1) * (0.8 + prey_adjacent * 0.4), 0.0, 1.0)
+
 			return 0.0
 
 		Action.MATE:

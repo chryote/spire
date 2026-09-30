@@ -69,6 +69,8 @@ static func create(
 	creature_comp.creature_name = name_override if name_override != "" else spec_data.get("display_name", "Creature")
 	creature_comp.stomach_capacity = spec_data.get("stomach_capacity", 50.0)
 	creature_comp.stomach_fill = creature_comp.stomach_capacity * 0.4
+	creature_comp.can_swim = spec_data.get("can_swim", false)
+	creature_comp.swim_speed_mult = spec_data.get("swim_speed_mult", 0.60)
 	world.add_component(creature_eid, creature_comp)
 
 	# 2. Position Component
