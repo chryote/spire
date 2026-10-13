@@ -129,6 +129,7 @@ const DATA: Dictionary = {
 			"metabolism_mult": 0.80,
 			"thirst_mult": 0.80,
 			"bleed_rate_mult": 0.70,
+			"shock_threshold_mod": 0.05,
 		}
 	},
 	Type.VIGILANT: {
@@ -153,6 +154,7 @@ const DATA: Dictionary = {
 		"stat_modifiers": {
 			"bleed_rate_mult": 0.80,
 			"pain_gain_mult": 0.70,
+			"shock_threshold_mod": 0.10,
 		}
 	},
 	Type.FRAIL: {
@@ -166,6 +168,7 @@ const DATA: Dictionary = {
 		"stat_modifiers": {
 			"move_cooldown": 1,
 			"fatigue_gain_mult": 1.30,
+			"shock_threshold_mod": -0.15,
 		}
 	},
 	Type.GREGARIOUS: {

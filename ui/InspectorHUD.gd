@@ -1005,7 +1005,10 @@ func _render_creature(reg, ceid: int) -> void:
 	if mind != null:
 		var mood_str: String = "Calm & Content"
 		var mood_col: Color = Color(0.6, 0.9, 0.6)
-		if mind.fear > 0.4:
+		if mind.is_in_shock:
+			mood_str = "IN TRAUMATIC SHOCK!"
+			mood_col = Color(1.0, 0.1, 0.3)
+		elif mind.fear > 0.4:
 			mood_str = "Terrified & Panicked!"
 			mood_col = Color(1.0, 0.3, 0.3)
 		elif mind.pain > 0.3:

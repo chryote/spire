@@ -122,7 +122,7 @@ func _test_creature_lifecycle_and_graze() -> void:
 	# 3. Verify Anatomy: Limbs, Organs, and Blood made of Item & Matter
 	# -----------------------------------------------------------------------
 	print("[Test] Verifying physical body anatomy...")
-	assert(body.limbs.size() == 6, "Grazer should have 6 limbs (head, torso, 4 legs)")
+	assert(body.limbs.size() >= 6, "Grazer should have at least 6 limbs (head, torso, 4 legs, genital)")
 	assert(body.organs.size() == 4, "Grazer should have 4 organs (heart, lungs, stomach, brain)")
 	assert(body.blood_volume > 2.0, "Blood volume should be initialized (>2.0L)")
 

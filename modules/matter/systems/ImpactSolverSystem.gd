@@ -522,12 +522,20 @@ func resolve_entity_impact(
 		var target_creature = reg.get_component(target_eid, &"CreatureComponent")
 		var target_body = reg.get_component(target_eid, &"BodyComponent")
 		var target_mind = reg.get_component(target_eid, &"MindComponent")
-		if target_body == null and reg.has(target_eid, &"ItemComponent"):
-			var t_item = reg.get_component(target_eid, &"ItemComponent")
-			if t_item != null and t_item.container_id != -1:
-				target_creature = reg.get_component(t_item.container_id, &"CreatureComponent")
-				target_body = reg.get_component(t_item.container_id, &"BodyComponent")
-				target_mind = reg.get_component(t_item.container_id, &"MindComponent")
+		var t_item = reg.get_component(target_eid, &"ItemComponent")
+
+		if target_body == null and t_item != null and t_item.container_id != -1:
+			target_creature = reg.get_component(t_item.container_id, &"CreatureComponent")
+			target_body = reg.get_component(t_item.container_id, &"BodyComponent")
+			target_mind = reg.get_component(t_item.container_id, &"MindComponent")
+
+		if t_item != null:
+			if t_item.parts.has(t_item.primary_part):
+				var wear_delta = result.damage_to_target / maxf(1.0, t_matter.yield_strength + result.damage_to_target)
+				t_item.parts[t_item.primary_part]["wear"] = clampf(t_item.parts[t_item.primary_part]["wear"] + wear_delta, 0.0, 1.0)
+			if t_item.parts.has("bone"):
+				var bone_wear_delta = (result.damage_to_target * 0.7) / maxf(1.0, t_matter.yield_strength + result.damage_to_target)
+				t_item.parts["bone"]["wear"] = clampf(t_item.parts["bone"]["wear"] + bone_wear_delta, 0.0, 1.0)
 
 		if target_creature != null:
 			target_creature.health = maxf(0.0, target_creature.health - result.damage_to_target)
@@ -608,6 +616,20 @@ func _handle_target_fracture(target_eid: int, t_matter, result: _ImpactTypes.Imp
 	# If target has vegetation, splinter and remove it
 	if reg.has(target_eid, &"VegetationComponent"):
 		reg.remove(target_eid, &"VegetationComponent")
+
+	# If target is a limb/item attached to a creature, sever it
+	var t_item = reg.get_component(target_eid, &"ItemComponent")
+	if t_item != null and t_item.container_id != -1:
+		var host_eid: int = t_item.container_id
+		var host_body = reg.get_component(host_eid, &"BodyComponent")
+		if host_body != null:
+			var severed_name: String = ""
+			for l_name: String in host_body.limbs:
+				if host_body.limbs[l_name] == target_eid:
+					severed_name = l_name
+					break
+			if severed_name != "":
+				host_body.sever_limb(world, host_eid, severed_name, reg)
 
 	# If target is creature, lethal fracture
 	var creature = reg.get_component(target_eid, &"CreatureComponent")

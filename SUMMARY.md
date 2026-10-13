@@ -1,5 +1,5 @@
 # Spire
-
+.
 **Spire** is a data-driven living world simulation built in [Godot 4.4](https://godotengine.org/) (GL Compatibility renderer) inspired by *Dwarf Fortress*, *RimWorld*, and *Cataclysm: Dark Days Ahead*.
 
 The simulation runs on a 128×128 tile world grid (16,384 tiles) driven by a pure Entity-Component-System (ECS) architecture, a multi-tier turn-tick loop, continuous thermodynamic and physical material dynamics, sensory signal grids, and utility AI cognitive agents (vector embedding).

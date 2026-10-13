@@ -88,8 +88,11 @@ static func create(
 
 	var anatomy: Dictionary = spec_data.get("anatomy", {})
 	var limbs_cfg: Dictionary = anatomy.get("limbs", {})
+	body_comp.vital_limbs.clear()
 	for limb_name: String in limbs_cfg:
 		var cfg: Dictionary = limbs_cfg[limb_name]
+		if cfg.get("vital", false) == true:
+			body_comp.vital_limbs.append(limb_name)
 		var limb_eid: int = _ItemFactory.create_composite(world, _ItemTypes.Type.LIMB, {
 			"flesh": cfg.get("flesh", 12),
 			"bone":  cfg.get("bone",  21),
@@ -208,6 +211,8 @@ static func create(
 		creature_comp.stomach_fill = creature_comp.stomach_capacity * 0.4
 	if trait_comp.get_stat_offset(&"move_cooldown") != 0:
 		pos_comp.base_move_interval = maxi(1, pos_comp.base_move_interval + trait_comp.get_stat_offset(&"move_cooldown"))
+	if trait_comp.get_stat_offset(&"shock_threshold_mod", 0.0) != 0.0:
+		mind_comp.shock_pain_threshold = clampf(0.80 + trait_comp.get_stat_offset(&"shock_threshold_mod", 0.0), 0.40, 0.95)
 
 	world.add_component(creature_eid, trait_comp)
 

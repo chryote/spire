@@ -96,16 +96,16 @@ const DATA: Dictionary = {
 		},
 		"anatomy": {
 			"limbs": {
-				"head":          { "volume": 0.0025, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.0 },
-				"torso":         { "volume": 0.0120, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.0 },
-				"left_foreleg":  { "volume": 0.0020, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.25 },
-				"right_foreleg": { "volume": 0.0020, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.25 },
-				"left_hindleg":  { "volume": 0.0025, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.25 },
-				"right_hindleg": { "volume": 0.0025, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.25 },
+				"head":          { "volume": 0.0025, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.0, "vital": true },
+				"torso":         { "volume": 0.0120, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.0, "vital": true },
+				"left_foreleg":  { "volume": 0.0020, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.25, "vital": false },
+				"right_foreleg": { "volume": 0.0020, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.25, "vital": false },
+				"left_hindleg":  { "volume": 0.0025, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.25, "vital": false },
+				"right_hindleg": { "volume": 0.0025, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.25, "vital": false },
 			},
 			"genitals": {
-				Gender.MALE:   { "name": "male_genital",   "volume": 0.0003, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.0 },
-				Gender.FEMALE: { "name": "female_genital", "volume": 0.0003, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.0 },
+				Gender.MALE:   { "name": "male_genital",   "volume": 0.0003, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.0, "vital": false },
+				Gender.FEMALE: { "name": "female_genital", "volume": 0.0003, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.0, "vital": false },
 			},
 			"organs": {
 				"heart":   { "volume": 0.0004, "matter": _MaterialTypes.Type.RAW_MEAT, "vital": true },
@@ -203,16 +203,16 @@ const DATA: Dictionary = {
 		},
 		"anatomy": {
 			"limbs": {
-				"head":          { "volume": 0.0006, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.0 },
-				"torso":         { "volume": 0.0030, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.0 },
-				"left_foreleg":  { "volume": 0.0004, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.25 },
-				"right_foreleg": { "volume": 0.0004, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.25 },
-				"left_hindleg":  { "volume": 0.0006, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.25 },
-				"right_hindleg": { "volume": 0.0006, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.25 },
+				"head":          { "volume": 0.0006, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.0, "vital": true },
+				"torso":         { "volume": 0.0030, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.0, "vital": true },
+				"left_foreleg":  { "volume": 0.0004, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.25, "vital": false },
+				"right_foreleg": { "volume": 0.0004, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.25, "vital": false },
+				"left_hindleg":  { "volume": 0.0006, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.25, "vital": false },
+				"right_hindleg": { "volume": 0.0006, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.25, "vital": false },
 			},
 			"genitals": {
-				Gender.MALE:   { "name": "male_genital",   "volume": 0.00008, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.0 },
-				Gender.FEMALE: { "name": "female_genital", "volume": 0.00008, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.0 },
+				Gender.MALE:   { "name": "male_genital",   "volume": 0.00008, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.0, "vital": false },
+				Gender.FEMALE: { "name": "female_genital", "volume": 0.00008, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.0, "vital": false },
 			},
 			"organs": {
 				"heart":   { "volume": 0.0001, "matter": _MaterialTypes.Type.RAW_MEAT, "vital": true },
@@ -310,16 +310,16 @@ const DATA: Dictionary = {
 		},
 		"anatomy": {
 			"limbs": {
-				"head":          { "volume": 0.006, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.0 },
-				"torso":         { "volume": 0.035, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.0 },
-				"left_foreleg":  { "volume": 0.005, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.25 },
-				"right_foreleg": { "volume": 0.005, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.25 },
-				"left_hindleg":  { "volume": 0.006, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.25 },
-				"right_hindleg": { "volume": 0.006, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.25 },
+				"head":          { "volume": 0.006, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.0, "vital": true },
+				"torso":         { "volume": 0.035, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.0, "vital": true },
+				"left_foreleg":  { "volume": 0.005, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.25, "vital": false },
+				"right_foreleg": { "volume": 0.005, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.25, "vital": false },
+				"left_hindleg":  { "volume": 0.006, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.25, "vital": false },
+				"right_hindleg": { "volume": 0.006, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.25, "vital": false },
 			},
 			"genitals": {
-				Gender.MALE:   { "name": "male_genital",   "volume": 0.0008, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.0 },
-				Gender.FEMALE: { "name": "female_genital", "volume": 0.0008, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.0 },
+				Gender.MALE:   { "name": "male_genital",   "volume": 0.0008, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.0, "vital": false },
+				Gender.FEMALE: { "name": "female_genital", "volume": 0.0008, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.0, "vital": false },
 			},
 			"organs": {
 				"heart":   { "volume": 0.0010, "matter": _MaterialTypes.Type.RAW_MEAT, "vital": true },
@@ -417,16 +417,16 @@ const DATA: Dictionary = {
 		},
 		"anatomy": {
 			"limbs": {
-				"head":          { "volume": 0.0040, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.0 },
-				"torso":         { "volume": 0.0220, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.0 },
-				"left_foreleg":  { "volume": 0.0035, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.25 },
-				"right_foreleg": { "volume": 0.0035, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.25 },
-				"left_hindleg":  { "volume": 0.0040, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.25 },
-				"right_hindleg": { "volume": 0.0040, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.25 },
+				"head":          { "volume": 0.0040, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.0, "vital": true },
+				"torso":         { "volume": 0.0220, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.0, "vital": true },
+				"left_foreleg":  { "volume": 0.0035, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.25, "vital": false },
+				"right_foreleg": { "volume": 0.0035, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.25, "vital": false },
+				"left_hindleg":  { "volume": 0.0040, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.25, "vital": false },
+				"right_hindleg": { "volume": 0.0040, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.25, "vital": false },
 			},
 			"genitals": {
-				Gender.MALE:   { "name": "male_genital",   "volume": 0.0004, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.0 },
-				Gender.FEMALE: { "name": "female_genital", "volume": 0.0004, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.0 },
+				Gender.MALE:   { "name": "male_genital",   "volume": 0.0004, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.0, "vital": false },
+				Gender.FEMALE: { "name": "female_genital", "volume": 0.0004, "flesh": _MaterialTypes.Type.RAW_MEAT, "bone": _MaterialTypes.Type.BONE, "mobility": 0.0, "vital": false },
 			},
 			"organs": {
 				"heart":   { "volume": 0.0006, "matter": _MaterialTypes.Type.RAW_MEAT, "vital": true },

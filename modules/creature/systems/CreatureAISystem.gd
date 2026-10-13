@@ -135,6 +135,15 @@ func tick(tick_number: int) -> void:
 		if plan.cover_search_cooldown > 0:
 			plan.cover_search_cooldown -= 1
 
+		# If creature is in traumatic shock, it is incapacitated / stunned
+		if mind.is_in_shock:
+			plan.clear_path()
+			plan.current_goal = _MindEmbeddings.Action.REST
+			mind.current_action = _MindEmbeddings.Action.REST
+			mind.action_utilities.clear()
+			mind.action_utilities[_MindEmbeddings.Action.REST] = 1.0
+			continue
+
 		# Time-slicing: If not in immediate danger and path queue is actively being traversed,
 		# stagger utility re-evaluation across 5 frames
 		var is_emergency: bool = (hazard > 0.2 or mind.fear > 0.35)

@@ -19,6 +19,15 @@ var action_utilities: Dictionary = {}
 ## Cached environmental signals sampled at the creature's current tile.
 var perceived_signals: Dictionary = {}
 
+## Traumatic shock state. True when pain exceeds shock_pain_threshold.
+var is_in_shock: bool = false
+
+## Pain threshold [0.0, 1.0] at which the creature enters traumatic shock.
+var shock_pain_threshold: float = 0.80
+
+## Monotonically increasing count of ticks spent continuously in shock.
+var shock_ticks: int = 0
+
 func _init() -> void:
 	drives.resize(_MindEmbeddings.DIMENSIONS)
 	drives.fill(0.0)

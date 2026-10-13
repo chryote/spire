@@ -5,14 +5,19 @@
 class_name BodyComponent
 extends Resource
 
-const _ItemComponent   = preload("res://modules/item/components/ItemComponent.gd")
-const _MatterComponent = preload("res://modules/matter/components/MatterComponent.gd")
+const _ItemComponent      = preload("res://modules/item/components/ItemComponent.gd")
+const _MatterComponent    = preload("res://modules/matter/components/MatterComponent.gd")
+const _InventoryComponent = preload("res://modules/item/components/InventoryComponent.gd")
+const _SignalTypes        = preload("res://modules/signal/data/SignalTypes.gd")
 
 ## Map of limb_name (String) -> entity_id (int)
 var limbs: Dictionary = {}
 
 ## Map of organ_name (String) -> entity_id (int)
 var organs: Dictionary = {}
+
+## Names of limbs considered vital to life (severing / loss results in instant death).
+var vital_limbs: Array[String] = ["head", "torso"]
 
 ## Circulatory fluid volume in liters.
 var blood_volume: float = 2.5
@@ -45,16 +50,16 @@ func get_total_mass(reg) -> float:
 
 ## Computes mobility factor [0.0, 1.0] based on leg condition.
 func get_mobility(reg) -> float:
-	if reg == null or limbs.is_empty():
+	if reg == null:
 		return 1.0
 
 	var item_store: Dictionary = reg.get_store(&"ItemComponent")
-	var leg_count: int = 0
+	var standard_legs: Array[String] = ["left_foreleg", "right_foreleg", "left_hindleg", "right_hindleg"]
+	var expected_leg_count: int = standard_legs.size()
 	var leg_health_sum: float = 0.0
 
-	for limb_name: String in limbs:
-		if limb_name.ends_with("leg"):
-			leg_count += 1
+	for limb_name: String in standard_legs:
+		if limbs.has(limb_name):
 			var eid: int = limbs[limb_name]
 			var item = item_store.get(eid, null)
 			if item != null:
@@ -65,24 +70,106 @@ func get_mobility(reg) -> float:
 			else:
 				leg_health_sum += 1.0
 
-	if leg_count == 0:
-		return 1.0
-	return clampf(leg_health_sum / float(leg_count), 0.1, 1.0)
+	return clampf(leg_health_sum / float(expected_leg_count), 0.1, 1.0)
 
-## Checks whether all critical vital organs (heart, lungs, brain) remain functional.
+## Checks whether all critical vital organs (heart, lungs, brain) and vital limbs (head, torso) remain functional.
 func are_vitals_functional(reg) -> bool:
 	if reg == null:
 		return true
 	var item_store: Dictionary = reg.get_store(&"ItemComponent")
+	
+	# 1. Check vital organs
 	for organ_name in ["heart", "lungs", "brain"]:
 		var eid: int = organs.get(organ_name, -1)
-		if eid != -1:
-			var item = item_store.get(eid, null)
-			if item != null:
-				var wear: float = item.parts.get("tissue", {}).get("wear", 0.0) as float
-				if wear >= 1.0:
-					return false
+		if eid == -1:
+			return false
+		var item = item_store.get(eid, null)
+		if item == null:
+			return false
+		var wear: float = item.parts.get("tissue", {}).get("wear", 0.0) as float
+		if wear >= 1.0:
+			return false
+
+	# 2. Check vital limbs (head, torso)
+	for limb_name in vital_limbs:
+		var eid: int = limbs.get(limb_name, -1)
+		if eid == -1:
+			return false
+		var item = item_store.get(eid, null)
+		if item == null:
+			return false
+		var flesh_wear: float = item.parts.get("flesh", {}).get("wear", 0.0) as float
+		var bone_wear: float  = item.parts.get("bone", {}).get("wear", 0.0) as float
+		if maxf(flesh_wear, bone_wear) >= 1.0:
+			return false
+
 	return true
+
+## Severs a limb from the creature and drops it into the ground tile's InventoryComponent.
+## Returns the severed limb entity ID (-1 if limb not found).
+func sever_limb(world: Node, creature_eid: int, limb_name: String, reg) -> int:
+	if not limbs.has(limb_name):
+		return -1
+
+	var limb_eid: int = limbs[limb_name]
+	limbs.erase(limb_name)
+
+	if reg == null or world == null:
+		return limb_eid
+
+	var pos_comp = reg.get_component(creature_eid, &"PositionComponent")
+	var creature_comp = reg.get_component(creature_eid, &"CreatureComponent")
+	var mind_comp = reg.get_component(creature_eid, &"MindComponent")
+	var item_comp = reg.get_component(limb_eid, &"ItemComponent")
+
+	var pos: Vector2i = pos_comp.position if pos_comp != null else Vector2i.ZERO
+	var tile_eid: int = world.get_entity_at(pos)
+
+	if tile_eid != -1:
+		var inv: _InventoryComponent = reg.get_component(tile_eid, &"InventoryComponent")
+		if inv == null:
+			inv = _InventoryComponent.new()
+			inv.container_id = tile_eid
+			reg.add(tile_eid, inv)
+
+		if item_comp != null:
+			item_comp.container_id = tile_eid
+			if not item_comp.display_name.begins_with("Severed "):
+				item_comp.display_name = "Severed " + item_comp.display_name
+
+		inv.items.append(limb_eid)
+		inv.update_cache(reg)
+
+		if world.signals != null:
+			world.signals.register_active_inventory(tile_eid)
+			world.signals.emit_scent(_SignalTypes.SCENT_BLOOD, pos, 0.8, 2)
+
+	# Apply severe physiological trauma
+	var is_vital: bool = vital_limbs.has(limb_name)
+	if is_vital:
+		if mind_comp != null:
+			mind_comp.pain = 1.0
+			mind_comp.is_in_shock = true
+		bleed_rate = 0.5
+		if creature_comp != null:
+			creature_comp.is_alive = false
+			creature_comp.health = 0.0
+	else:
+		if mind_comp != null:
+			mind_comp.pain = minf(1.0, mind_comp.pain + 0.40)
+			if mind_comp.pain >= mind_comp.shock_pain_threshold:
+				mind_comp.is_in_shock = true
+		bleed_rate = minf(0.5, bleed_rate + 0.15)
+
+	world.mark_render_dirty()
+	print("[Creature] Limb '%s' (eid=%d) severed from %s at %s. (vital=%s)" % [
+		limb_name,
+		limb_eid,
+		creature_comp.creature_name if creature_comp != null else "Creature",
+		pos,
+		is_vital
+	])
+	return limb_eid
 
 ## Proportionally rescales blood volume and anatomical parts (limbs and organs).
 func rescale_anatomy(reg, new_scale: float, old_scale: float) -> void:

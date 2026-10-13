@@ -102,6 +102,18 @@ func tick(_tick_number: int) -> void:
 				# Emit blood scent into atmosphere
 				if pos_comp != null and world.signals != null:
 					world.signals.emit_scent(_SignalTypes.SCENT_BLOOD, pos_comp.position, 0.6, 2)
+			else:
+				if mind != null:
+					mind.pain = maxf(0.0, mind.pain - 0.005)
+
+			# 3b. Shock state evaluation with hysteresis
+			if mind != null:
+				if mind.pain >= mind.shock_pain_threshold:
+					mind.is_in_shock = true
+					mind.shock_ticks += 1
+				elif mind.pain < maxf(0.0, mind.shock_pain_threshold - 0.15):
+					mind.is_in_shock = false
+					mind.shock_ticks = 0
 
 			# 4. Mobility calculation from leg health
 			creature.mobility_factor = body.get_mobility(reg)
@@ -110,9 +122,13 @@ func tick(_tick_number: int) -> void:
 			var blood_ratio: float = body.blood_volume / maxf(0.1, body.max_blood_volume)
 			creature.health = blood_ratio
 
-			if blood_ratio <= 0.2 or not body.are_vitals_functional(reg):
+			var vitals_ok: bool = body.are_vitals_functional(reg)
+			var shock_collapse: bool = (mind != null and mind.is_in_shock and mind.pain >= 0.98 and blood_ratio < 0.35)
+
+			if blood_ratio <= 0.2 or not vitals_ok or shock_collapse:
 				creature.is_alive = false
-				print("[Creature] %s (eid=%d) died." % [creature.creature_name, eid])
+				var reason: String = "Blood loss" if blood_ratio <= 0.2 else ("Vital destroyed/severed" if not vitals_ok else "Traumatic shock collapse")
+				print("[Creature] %s (eid=%d) died. Reason: %s." % [creature.creature_name, eid, reason])
 				if not creature.carcass_dropped:
 					_drop_carcass_items(eid, creature, pos_comp, reg)
 
